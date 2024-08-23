@@ -72,7 +72,7 @@
                         </div>
                     </form>
 
-                    <div>
+                    <div class="dropdown">
                         <button type="button" class="btn btn-outline--primary text-nowrap btn-block"
                                 data-toggle="dropdown">
                             <i class="tio-download-to"></i>
@@ -81,7 +81,10 @@
                         </button>
                         <ul class="dropdown-menu dropdown-menu-right">
                             <li><a class="dropdown-item"
-                                   href="{{ route('vendor.report.product-stock-export', ['category_id' => request('category_id'), 'sort' => request('sort'), 'search' => request('search')]) }}">{{translate('excel')}}</a>
+                                   href="{{ route('vendor.report.product-stock-export', ['category_id' => request('category_id'), 'sort' => request('sort'), 'search' => request('search')]) }}">
+                                    <img width="14" src="{{dynamicAsset(path: 'public/assets/back-end/img/excel.png')}}" alt="">
+                                    {{translate('excel')}}
+                                </a>
                             </li>
                         </ul>
                     </div>

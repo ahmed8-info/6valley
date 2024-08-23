@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers\RestAPI\v1\auth;
 
-use App\Events\PasswordResetMailEvent;
+use App\Events\PasswordResetEvent;
 use App\Http\Controllers\Controller;
 use App\Models\PasswordReset;
-use App\User;
+use App\Models\User;
 use App\Utils\Helpers;
 use App\Utils\SMS_module;
 use Carbon\Carbon;
@@ -65,7 +65,15 @@ class ForgotPassword extends Controller
                     }
                     if ($emailServices_smtp['status'] == 1) {
                         try{
-                            PasswordResetMailEvent::dispatch($customer['email'], $reset_url);
+                            $data = [
+                                'userType' => 'customer',
+                                'templateName' => 'forgot-password',
+                                'vendorName' => $customer['f_name'],
+                                'subject' => translate('password_reset'),
+                                'title' => translate('password_reset'),
+                                'passwordResetURL' => $reset_url,
+                            ];
+                            event(new PasswordResetEvent(email: $customer['email'],data: $data));
                             $response = 'Check your email';
                         } catch (\Exception $exception) {
                             return response()->json([

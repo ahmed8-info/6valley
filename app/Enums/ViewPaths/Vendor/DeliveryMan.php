@@ -29,4 +29,9 @@ enum DeliveryMan
         URI => 'rating',
         VIEW => 'vendor-views.delivery-man.rating'
     ];
+    const EXPORT = [
+        URI => 'export',
+        VIEW => ''
+    ];
+
 }

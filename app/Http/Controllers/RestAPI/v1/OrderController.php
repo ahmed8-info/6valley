@@ -2,7 +2,8 @@
 
 namespace App\Http\Controllers\RestAPI\v1;
 
-use App\Events\DigitalProductOtpVerificationMailEvent;
+use App\Events\DigitalProductOtpVerificationEvent;
+use App\Events\RefundEvent;
 use App\Http\Controllers\Controller;
 use App\Models\Cart;
 use App\Models\DigitalProductOtpVerification;
@@ -13,8 +14,9 @@ use App\Models\RefundRequest;
 use App\Models\Setting;
 use App\Models\ShippingAddress;
 use App\Traits\CommonTrait;
+use App\Traits\FileManagerTrait;
 use App\Traits\SmsGateway;
-use App\User;
+use App\Models\User;
 use App\Utils\CartManager;
 use App\Utils\Convert;
 use App\Utils\CustomerManager;
@@ -24,13 +26,14 @@ use App\Utils\OrderManager;
 use App\Utils\SMS_module;
 use Carbon\Carbon;
 use Carbon\CarbonInterval;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Validator;
 
 class OrderController extends Controller
 {
-    use CommonTrait;
+    use CommonTrait, FileManagerTrait;
     public function track_by_order_id(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -65,141 +68,200 @@ class OrderController extends Controller
 
         return response()->json(['message' => translate('status_not_changeable_now')], 403);
     }
-    public function place_order(Request $request)
+
+    public function place_order(Request $request): JsonResponse
     {
         $user = Helpers::get_customer($request);
+        $newCustomerRegister = null;
+        $cartGroupIds = CartManager::get_cart_group_ids(request: $request, type: 'checked');
+        $carts = Cart::with('product')->whereIn('cart_group_id', $cartGroupIds)->where(['is_checked' => 1])->get();
 
-        $cart_group_ids = CartManager::get_cart_group_ids($request);
-        $carts = Cart::with('product')->whereIn('cart_group_id', $cart_group_ids)->get();
-
-        $product_stock = CartManager::product_stock_check($carts);
-        if(!$product_stock){
+        $productStockCheck = CartManager::product_stock_check($carts);
+        if (!$productStockCheck) {
             return response()->json(['message' => 'The following items in your cart are currently out of stock'], 403);
         }
 
         $verifyStatus = OrderManager::minimum_order_amount_verify($request);
-        if($verifyStatus['status'] == 0){
-            return response()->json(['message' => 'Check minimum order amount requirement'], 403);
+        if ($verifyStatus['status'] == 0) {
+            return response()->json(['message' => translate('Check_minimum_order_amount_requirement')], 403);
         }
 
-        $physical_product = false;
-        foreach($carts as $cart){
-            if($cart->product_type == 'physical'){
-                $physical_product = true;
+        if ($user == 'offline' && $request->has('address_id') && $request['address_id']) {
+            $shippingAddress = ShippingAddress::where(['customer_id' => $request['guest_id'], 'is_guest' => 1, 'id' => $request->input('address_id')])->first();
+            if ($request['is_check_create_account'] && $shippingAddress) {
+                if (User::where(['email' => $shippingAddress['email']])->orWhere(['phone' => $shippingAddress['phone']])->first()) {
+                    return response()->json(['message' => translate('Already_registered ')], 403);
+                } else {
+                    $newCustomerRegister = self::addNewCustomer(request: $request, address: $shippingAddress);
+                }
             }
         }
 
-        if($physical_product) {
-            $zip_restrict_status = Helpers::get_business_settings('delivery_zip_code_area_restriction');
-            $country_restrict_status = Helpers::get_business_settings('delivery_country_restriction');
+        $physicalProduct = false;
+        foreach ($carts as $cart) {
+            if ($cart->product_type == 'physical') {
+                $physicalProduct = true;
+            }
+        }
 
-            if ($request->has('billing_address_id') && $request->billing_address_id) {
+        if ($physicalProduct) {
+            $zipRestrictStatus = getWebConfig(name: 'delivery_zip_code_area_restriction');
+            $countryRestrictStatus = getWebConfig(name: 'delivery_country_restriction');
+
+            if ($request->has('billing_address_id') && $request['billing_address_id']) {
                 if ($user == 'offline') {
-                    $shipping_address = ShippingAddress::where(['customer_id' => $request->guest_id,'is_guest'=>1, 'id' => $request->input('billing_address_id')])->first();
-                }else{
-                    $shipping_address = ShippingAddress::where(['customer_id' => $user->id,'is_guest'=>'0', 'id' => $request->input('billing_address_id')])->first();
+                    $billingAddress = ShippingAddress::where(['customer_id' => $request['guest_id'], 'is_guest' => 1, 'id' => $request->input('billing_address_id')])->first();
+                    if ($request['is_check_create_account'] && $billingAddress && $request['address_id'] == null) {
+                        if (User::where(['email' => $billingAddress['email']])->orWhere(['phone' => $billingAddress['phone']])->first()) {
+                            return response()->json(['message' => translate('Already_registered ')], 403);
+                        } else {
+                            $newCustomerRegister = self::addNewCustomer(request: $request, address: $billingAddress);
+                        }
+                    }
+                } else {
+                    $billingAddress = ShippingAddress::where(['customer_id' => $user->id, 'is_guest' => '0', 'id' => $request->input('billing_address_id')])->first();
                 }
 
-                if (!$shipping_address) {
+                if (!$billingAddress) {
                     return response()->json(['message' => translate('address_not_found')], 403);
-                }
-                elseif ($country_restrict_status && !self::delivery_country_exist_check($shipping_address->country)) {
+                } elseif ($countryRestrictStatus && !self::delivery_country_exist_check($billingAddress->country)) {
                     return response()->json(['message' => translate('Delivery_unavailable_for_this_country')], 403);
-
-                } elseif ($zip_restrict_status && !self::delivery_zipcode_exist_check($shipping_address->zip)) {
+                } elseif ($zipRestrictStatus && !self::delivery_zipcode_exist_check($billingAddress->zip)) {
                     return response()->json(['message' => translate('Delivery_unavailable_for_this_zip_code_area')], 403);
                 }
             }
         }
 
-        $unique_id = OrderManager::gen_unique_id();
+        $getUniqueId = OrderManager::gen_unique_id();
 
-        $order_ids = [];
-        foreach ($cart_group_ids as $group_id) {
+        $orderIds = [];
+        foreach ($cartGroupIds as $groupId) {
             $data = [
                 'payment_method' => 'cash_on_delivery',
                 'order_status' => 'pending',
                 'payment_status' => 'unpaid',
                 'transaction_ref' => '',
-                'order_group_id' => $unique_id,
-                'cart_group_id' => $group_id,
+                'order_group_id' => $getUniqueId,
+                'cart_group_id' => $groupId,
                 'request' => $request,
+                'newCustomerRegister' => $newCustomerRegister,
             ];
-            $order_id = OrderManager::generate_order($data);
 
-            $order = Order::find($order_id);
+            $orderId = OrderManager::generate_order($data);
+
+            $order = Order::find($orderId);
             $order->billing_address = ($request['billing_address_id'] != null) ? $request['billing_address_id'] : $order['billing_address'];
-            $order->billing_address_data = ($request['billing_address_id'] != null) ?  ShippingAddress::find($request['billing_address_id']) : $order['billing_address_data'];
+            $order->billing_address_data = ($request['billing_address_id'] != null) ? ShippingAddress::find($request['billing_address_id']) : $order['billing_address_data'];
             $order->order_note = ($request['order_note'] != null) ? $request['order_note'] : $order['order_note'];
             $order->save();
 
-            array_push($order_ids, $order_id);
+            $orderIds[] = $orderId;
         }
 
         CartManager::cart_clean($request);
 
-        return response()->json(['order_ids'=>$order_ids], 200);
+        if($newCustomerRegister) {
+            ShippingAddress::where(['customer_id' => $request['guest_id'], 'is_guest' => 1, 'id' => $request->input('address_id')])
+                ->update(['customer_id' => $newCustomerRegister['id'], 'is_guest' => 0]);
+            ShippingAddress::where(['customer_id' => $request['guest_id'], 'is_guest' => 1, 'id' => $request->input('billing_address_id')])
+                ->update(['customer_id' => $newCustomerRegister['id'], 'is_guest' => 0]);
+        }
+
+        return response()->json([
+            'order_ids' => $orderIds,
+            'new_user' => (bool)$newCustomerRegister
+        ], 200);
     }
 
-    public function place_order_by_offline_payment(Request $request)
+    function addNewCustomer($request, $address)
     {
-        $cart_group_ids = CartManager::get_cart_group_ids($request);
-        $carts = Cart::with('product')->whereIn('cart_group_id', $cart_group_ids)->get();
+        return User::create([
+            'name' => $address['contact_person_name'],
+            'f_name' => $address['contact_person_name'],
+            'l_name' => '',
+            'email' => $address['email'],
+            'phone' => $address['phone'],
+            'is_active' => 1,
+            'password' => bcrypt($request['password']),
+            'referral_code' => Helpers::generate_referer_code(),
+        ]);
+    }
 
-        $product_stock = CartManager::product_stock_check($carts);
-        if(!$product_stock){
+    public function placeOrderByOfflinePayment(Request $request): JsonResponse
+    {
+        $user = Helpers::get_customer($request);
+        $newCustomerRegister = null;
+        $cartGroupIds = CartManager::get_cart_group_ids(request: $request, type: 'checked');
+        $carts = Cart::with('product')->whereIn('cart_group_id', $cartGroupIds)->where(['is_checked' => 1])->get();
+
+        $productStockCheck = CartManager::product_stock_check($carts);
+        if (!$productStockCheck) {
             return response()->json(['message' => 'The following items in your cart are currently out of stock'], 403);
         }
 
         $verifyStatus = OrderManager::minimum_order_amount_verify($request);
-        if($verifyStatus['status'] == 0){
+        if ($verifyStatus['status'] == 0) {
             return response()->json(['message' => 'Check minimum order amount requirement'], 403);
         }
 
-        $physical_product = false;
-        foreach($carts as $cart){
-            if($cart->product_type == 'physical'){
-                $physical_product = true;
+        if ($user == 'offline' && $request->has('address_id') && $request['address_id']) {
+            $shippingAddress = ShippingAddress::where(['customer_id' => $request['guest_id'], 'is_guest' => 1, 'id' => $request->input('address_id')])->first();
+            if ($request['is_check_create_account'] && $shippingAddress) {
+                if (User::where(['email' => $shippingAddress['email']])->orWhere(['phone' => $shippingAddress['phone']])->first()) {
+                    return response()->json(['message' => translate('Already_registered ')], 403);
+                } else {
+                    $newCustomerRegister = self::addNewCustomer(request: $request, address: $shippingAddress);
+                }
             }
         }
 
-        $user = Helpers::get_customer($request);
+        $physicalProductExist = false;
+        foreach ($carts as $cart) {
+            if ($cart->product_type == 'physical') {
+                $physicalProductExist = true;
+            }
+        }
 
-        if($physical_product) {
-            $zip_restrict_status = Helpers::get_business_settings('delivery_zip_code_area_restriction');
-            $country_restrict_status = Helpers::get_business_settings('delivery_country_restriction');
+        if ($physicalProductExist) {
+            $zipRestrictStatus = getWebConfig(name: 'delivery_zip_code_area_restriction');
+            $countryRestrictStatus = getWebConfig(name: 'delivery_country_restriction');
 
-            if ($request->has('billing_address_id') && $request->billing_address_id) {
+            if ($request->has('billing_address_id') && $request['billing_address_id']) {
                 if ($user == 'offline') {
-                    $shipping_address = ShippingAddress::where(['customer_id' => $request->guest_id,'is_guest'=>1, 'id' => $request->input('billing_address_id')])->first();
-                }else{
-                    $shipping_address = ShippingAddress::where(['customer_id' => $user->id,'is_guest'=>'0', 'id' => $request->input('billing_address_id')])->first();
+                    $billingAddress = ShippingAddress::where(['customer_id' => $request['guest_id'], 'is_guest' => 1, 'id' => $request->input('billing_address_id')])->first();
+                    if ($request['is_check_create_account'] && $billingAddress && $request['address_id'] == null) {
+                        if (User::where(['email' => $billingAddress['email']])->orWhere(['phone' => $billingAddress['phone']])->first()) {
+                            return response()->json(['message' => translate('Already_registered ')], 403);
+                        } else {
+                            $newCustomerRegister = self::addNewCustomer(request: $request, address: $billingAddress);
+                        }
+                    }
+                } else {
+                    $billingAddress = ShippingAddress::where(['customer_id' => $user->id, 'is_guest' => '0', 'id' => $request->input('billing_address_id')])->first();
                 }
 
-                if (!$shipping_address) {
+                if (!$billingAddress) {
                     return response()->json(['message' => translate('address_not_found')], 200);
-                }
-                elseif ($country_restrict_status && !self::delivery_country_exist_check($shipping_address->country)) {
+                } elseif ($countryRestrictStatus && !self::delivery_country_exist_check($billingAddress->country)) {
                     return response()->json(['message' => translate('Delivery_unavailable_for_this_country')], 403);
 
-                } elseif ($zip_restrict_status && !self::delivery_zipcode_exist_check($shipping_address->zip)) {
+                } elseif ($zipRestrictStatus && !self::delivery_zipcode_exist_check($billingAddress->zip)) {
                     return response()->json(['message' => translate('Delivery_unavailable_for_this_zip_code_area')], 403);
                 }
             }
         }
 
         $offline_payment_info = [];
-        $method = OfflinePaymentMethod::where(['id'=>$request->method_id,'status'=>1])->first();
+        $method = OfflinePaymentMethod::where(['id' => $request['method_id'], 'status' => 1])->first();
 
-        if(isset($method))
-        {
+        if (isset($method)) {
             $fields = array_column($method->method_informations, 'customer_input');
-            $values = (array) json_decode(base64_decode($request->method_informations));
+            $values = (array)json_decode(base64_decode($request['method_informations']));
 
-            $offline_payment_info['method_id'] = $request->method_id;
+            $offline_payment_info['method_id'] = $request['method_id'];
             $offline_payment_info['method_name'] = $method->method_name;
             foreach ($fields as $field) {
-                if(key_exists($field, $values)) {
+                if (key_exists($field, $values)) {
                     $offline_payment_info[$field] = $values[$field];
                 }
             }
@@ -207,37 +269,47 @@ class OrderController extends Controller
 
         $unique_id = OrderManager::gen_unique_id();
         $order_ids = [];
-        foreach ($cart_group_ids as $group_id) {
+        foreach ($cartGroupIds as $group_id) {
             $data = [
                 'payment_method' => 'offline_payment',
                 'order_status' => 'pending',
                 'payment_status' => 'unpaid',
-                'payment_note' => $request->payment_note,
+                'payment_note' => $request['payment_note'],
                 'order_group_id' => $unique_id,
                 'cart_group_id' => $group_id,
                 'request' => $request,
+                'newCustomerRegister' => $newCustomerRegister,
                 'offline_payment_info' => $offline_payment_info,
             ];
             $order_id = OrderManager::generate_order($data);
 
             $order = Order::find($order_id);
             $order->billing_address = ($request['billing_address_id'] != null) ? $request['billing_address_id'] : $order['billing_address'];
-            $order->billing_address_data = ($request['billing_address_id'] != null) ?  ShippingAddress::find($request['billing_address_id']) : $order['billing_address_data'];
+            $order->billing_address_data = ($request['billing_address_id'] != null) ? ShippingAddress::find($request['billing_address_id']) : $order['billing_address_data'];
             $order->order_note = ($request['order_note'] != null) ? $request['order_note'] : $order['order_note'];
             $order->save();
+            $order_ids[] = $order_id;
+        }
 
-            array_push($order_ids, $order_id);
+        if($newCustomerRegister) {
+            ShippingAddress::where(['customer_id' => $request['guest_id'], 'is_guest' => 1, 'id' => $request->input('address_id')])
+                ->update(['customer_id' => $newCustomerRegister['id'], 'is_guest' => 0]);
+            ShippingAddress::where(['customer_id' => $request['guest_id'], 'is_guest' => 1, 'id' => $request->input('billing_address_id')])
+                ->update(['customer_id' => $newCustomerRegister['id'], 'is_guest' => 0]);
         }
 
         CartManager::cart_clean($request);
 
-        return response()->json(translate('order_placed_successfully'), 200);
+        return response()->json([
+            'messages' => translate('order_placed_successfully'),
+            'new_user' => (bool)$newCustomerRegister,
+        ], 200);
     }
 
-    public function place_order_by_wallet(Request $request)
+    public function place_order_by_wallet(Request $request): JsonResponse
     {
-        $cart_group_ids = CartManager::get_cart_group_ids($request);
-        $carts = Cart::with('product')->whereIn('cart_group_id', $cart_group_ids)->get();
+        $cart_group_ids = CartManager::get_cart_group_ids(request: $request, type: 'checked');
+        $carts = Cart::with('product')->whereIn('cart_group_id', $cart_group_ids)->where(['is_checked' => 1])->get();
 
         $product_stock = CartManager::product_stock_check($carts);
         if(!$product_stock){
@@ -251,7 +323,7 @@ class OrderController extends Controller
 
         $cartTotal = 0;
         foreach($cart_group_ids as $cart_group_id){
-            $cartTotal += CartManager::cart_grand_total($cart_group_id);
+            $cartTotal += CartManager::cart_grand_total(cartGroupId: $cart_group_id, type: 'checked');
         }
         $user = Helpers::get_customer($request);
         if( $cartTotal > $user->wallet_balance)
@@ -305,7 +377,7 @@ class OrderController extends Controller
                 $order->order_note = ($request['order_note'] != null) ? $request['order_note'] : $order['order_note'];
                 $order->save();
 
-                array_push($order_ids, $order_id);
+                $order_ids[] = $order_id;
             }
 
             CustomerManager::create_wallet_transaction($user->id, Convert::default($cartTotal), 'order_place','order payment');
@@ -419,14 +491,21 @@ class OrderController extends Controller
 
             if ($request->file('images')) {
                 foreach ($request->file('images') as $img) {
-                    $product_images[] = ImageManager::upload('refund/', 'webp', $img);
+                    $images[] = [
+                        'image_name' => $this->upload('refund/', 'webp', $img),
+                        'storage' => getWebConfig(name: 'storage_connection_type') ?? 'public',
+                    ];
+
                 }
-                $refund_request->images = json_encode($product_images);
+                $refund_request->images = $images;
             }
             $refund_request->save();
 
             $order_details->refund_request = 1;
             $order_details->save();
+
+            $order = Order::find($order_details->order_id);
+            event(new RefundEvent(status: 'refund_request', order: $order));
 
             return response()->json(translate('refunded_request_updated_successfully!!'), 200);
         }else{
@@ -439,10 +518,6 @@ class OrderController extends Controller
         $order_details = OrderDetail::find($request->id);
         $refund = RefundRequest::where('customer_id',$request->user()->id)
                                 ->where('order_details_id',$order_details->id )->get();
-        $refund = $refund->map(function($query){
-            $query['images'] = json_decode($query['images']);
-            return $query;
-        });
 
         $order = Order::find($order_details->order_id);
 
@@ -579,7 +654,15 @@ class OrderController extends Controller
 
                 if ($emailServices_smtp['status'] == 1) {
                     try{
-                        DigitalProductOtpVerificationMailEvent::dispatch($customer['email'], $token);
+                        $data = [
+                            'userName'=>$customer['f_name'],
+                            'userType' =>'customer',
+                            'templateName' =>'digital-product-otp',
+                            'subject' => translate('verification_Code'),
+                            'title' => translate('verification_Code').'!',
+                            'verificationCode' => $token,
+                        ];
+                        event(new DigitalProductOtpVerificationEvent(email: $customer['email'],data: $data));
                         $mail_status = 1;
                     } catch (\Exception $exception) {
                     }
@@ -682,9 +765,11 @@ class OrderController extends Controller
 
             try {
                 if($order_details_data->order->shipping_address_data){
+                    $guest_name = $order_details_data->order->shipping_address_data ? $order_details_data->order->shipping_address_data->contact_person_name : null;
                     $guest_email = $order_details_data->order->shipping_address_data ? $order_details_data->order->shipping_address_data->email : null;
                     $guest_phone = $order_details_data->order->shipping_address_data ? $order_details_data->order->shipping_address_data->phone : null;
                 }else{
+                    $guest_name = $order_details_data->order->billing_address_data ? $order_details_data->order->billing_address_data->contact_person_name : null;
                     $guest_email = $order_details_data->order->billing_address_data ? $order_details_data->order->billing_address_data->email : null;
                     $guest_phone = $order_details_data->order->billing_address_data ? $order_details_data->order->billing_address_data->phone : null;
                 }
@@ -698,7 +783,15 @@ class OrderController extends Controller
             }
             if ($emailServices_smtp['status'] == 1) {
                 try{
-                    DigitalProductOtpVerificationMailEvent::dispatch($guest_email, $token);
+                    $data = [
+                        'userName'=>$guest_name,
+                        'userType' =>'customer',
+                        'templateName' =>'digital-product-otp',
+                        'subject' => translate('verification_Code'),
+                        'title' => translate('verification_Code').'!',
+                        'verificationCode' => $token,
+                    ];
+                    event(new DigitalProductOtpVerificationEvent(email: $guest_email,data: $data));
                     $mail_status = 1;
                 } catch (\Exception $exception) {
                     $mail_status = 0;
@@ -761,72 +854,77 @@ class OrderController extends Controller
         }
     }
 
-    public function offline_payment_method_list(Request $request)
+    public function offline_payment_method_list(Request $request): JsonResponse
     {
         $data = OfflinePaymentMethod::where('status', 1)->get();
         return response()->json(['offline_methods'=>$data], 200);
     }
 
-    public function track_order(Request $request)
+    public function track_order(Request $request): JsonResponse
     {
-
         $user = Helpers::get_customer($request);
 
         if ($user != 'offline') {
-            $order = Order::where(['id'=> $request['order_id'], 'order_type'=>'default_type'])->first();
-            if($order && $order->is_guest){
-                $orderDetails = Order::where(['id'=> $request['order_id'], 'order_type'=>'default_type'])->whereHas('shippingAddress', function ($query) use ($request) {
-                    $query->where('phone', $request->phone_number);
+            $order = Order::where(['id' => $request['order_id'], 'order_type' => 'default_type'])->first();
+            if ($order && $order->is_guest) {
+                $orderDetails = Order::where(['id' => $request['order_id'], 'order_type' => 'default_type'])->whereHas('shippingAddress', function ($query) use ($request) {
+                    $query->where('phone', $request['phone_number']);
                 })->first();
 
-                if(!$orderDetails){
-                    $orderDetails = Order::where(['id'=> $request['order_id'], 'order_type'=>'default_type'])->whereHas('billingAddress', function ($query) use ($request) {
-                            $query->where('phone', $request->phone_number);
-                        })->first();
+                if (!$orderDetails) {
+                    $orderDetails = Order::where(['id' => $request['order_id'], 'order_type' => 'default_type'])->whereHas('billingAddress', function ($query) use ($request) {
+                        $query->where('phone', $request['phone_number']);
+                    })->first();
                 }
-            }elseif ($user->phone == $request->phone_number) {
-                $orderDetails = Order::where(['id'=> $request['order_id'], 'order_type'=>'default_type', 'customer_id'=> auth('customer')->id()])
+            } elseif ($user->phone == $request['phone_number']) {
+                $orderDetails = Order::where(['id' => $request['order_id'], 'order_type' => 'default_type', 'customer_id' => auth('customer')->id()])
                     ->whereHas('details', function ($query) {
-                       return $query;
+                        return $query;
                     })->first();
             }
 
-            if ($request->from_order_details == 1) {
-                $orderDetails = Order::where(['id'=> $request['order_id'], 'order_type'=>'default_type'])->whereHas('details', function ($query) {
+            if ($request['from_order_details'] == 1) {
+                $orderDetails = Order::where(['id' => $request['order_id'], 'order_type' => 'default_type'])->whereHas('details', function ($query) {
                     $query->where('customer_id', auth('customer')->id());
                 })->first();
             }
 
         } else {
-            $user_id = User::where('phone', $request->phone_number)->first();
+            $user_id = User::where('phone', $request['phone_number'])->first();
             $order = Order::where('id', $request['order_id'])->first();
 
-            if($order && $order->is_guest){
-                $orderDetails = Order::where(['id'=> $request['order_id'], 'order_type'=>'default_type'])->whereHas('shippingAddress', function ($query) use ($request) {
-                    $query->where('phone', $request->phone_number);
+            if ($order && $order->is_guest) {
+                $orderDetails = Order::where(['id' => $request['order_id'], 'order_type' => 'default_type'])->whereHas('shippingAddress', function ($query) use ($request) {
+                    $query->where('phone', $request['phone_number']);
                 })->first();
 
-                if(!$orderDetails){
-                    $orderDetails = Order::where(['id'=> $request['order_id'], 'order_type'=>'default_type'])->whereHas('billingAddress', function ($query) use ($request) {
-                            $query->where('phone', $request->phone_number);
-                        })->first();
+                if (!$orderDetails) {
+                    $orderDetails = Order::where(['id' => $request['order_id'], 'order_type' => 'default_type'])->whereHas('billingAddress', function ($query) use ($request) {
+                        $query->where('phone', $request['phone_number']);
+                    })->first();
                 }
-            }elseif($user_id){
-                $orderDetails = Order::where(['customer_id'=> $user_id->id, 'id'=> $request['order_id'], 'order_type'=>'default_type'])->whereHas('details', function ($query) {
+            } elseif ($user_id) {
+                $orderDetails = Order::where(['customer_id' => $user_id->id, 'id' => $request['order_id'], 'order_type' => 'default_type'])->whereHas('details', function ($query) {
                     return $query;
                 })->first();
-            }else{
+            } else {
                 return response()->json(['message' => 'Invalid Phone Number'], 403);
             }
         }
 
         if (isset($orderDetails)) {
-            $details = OrderDetail::with(['order.deliveryMan','verificationImages','seller.shop'])
+            $details = OrderDetail::with(['order.deliveryMan', 'verificationImages', 'seller.shop'])
                 ->where(['order_id' => $orderDetails['id']])
                 ->get();
+
             $details->map(function ($query) {
                 $query['variation'] = json_decode($query['variation'], true);
-                $query['product_details'] = Helpers::product_data_formatting(json_decode($query['product_details'], true));
+                $product = json_decode($query['product_details'], true);
+                if ($product['product_type'] == 'digital' && $product['digital_product_type'] == 'ready_product' && $product['digital_file_ready']) {
+                    $checkFilePath = storageLink('product/digital-product', $product['digital_file_ready'], ($product['storage_path'] ?? 'public'));
+                    $product['digital_file_ready_full_url'] = $checkFilePath;
+                }
+                $query['product_details'] = Helpers::product_data_formatting($product);
                 return $query;
             });
 

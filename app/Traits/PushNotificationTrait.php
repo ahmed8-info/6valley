@@ -4,7 +4,7 @@ namespace App\Traits;
 
 use App\Models\NotificationMessage;
 use App\Models\Order;
-use phpDocumentor\Reflection\Type;
+use Illuminate\Support\Facades\Http;
 
 trait PushNotificationTrait
 {
@@ -103,13 +103,12 @@ trait PushNotificationTrait
             if ($fcm_token) {
                 $lang = $userData?->app_language ?? getDefaultLanguage();
                 $value = $this->pushNotificationMessage($key, $type, $lang);
-
                 $value = $this->textVariableDataFormat(
                     value: $value,
                     key: $key,
-                    userName: "{$messageForm?->f_name} {$messageForm?->l_name}",
-                    shopName: $messageForm?->shop?->name,
-                    deliveryManName: "{$messageForm?->f_name} {$messageForm?->l_name}",
+                    userName: "{$messageForm?->f_name} ",
+                    shopName: "{$messageForm?->shop?->name}",
+                    deliveryManName: "{$messageForm?->f_name}",
                     time: now()->diffForHumans()
                 );
                 $data = [
@@ -122,12 +121,14 @@ trait PushNotificationTrait
                 $this->sendPushNotificationToDevice($fcm_token, $data);
             }
         } catch (\Exception $exception) {
+
         }
 
     }
-    protected function withdrawStatusUpdateNotification(string $key,string $type,string $lang, int $status ,string $fcmToken):void
+
+    protected function withdrawStatusUpdateNotification(string $key, string $type, string $lang, int $status, string $fcmToken): void
     {
-        $value = $this->pushNotificationMessage($key,$type, $lang);
+        $value = $this->pushNotificationMessage($key, $type, $lang);
         if ($value != null) {
             $data = [
                 'title' => translate('withdraw_request_' . ($status == 1 ? 'approved' : 'denied')),
@@ -138,12 +139,13 @@ trait PushNotificationTrait
             $this->sendPushNotificationToDevice($fcmToken, $data);
         }
     }
-    protected function customerStatusUpdateNotification(string $key,string $type,string $lang, string $status ,string $fcmToken):void
+
+    protected function customerStatusUpdateNotification(string $key, string $type, string $lang, string $status, string $fcmToken): void
     {
-        $value = $this->pushNotificationMessage($key,$type, $lang);
+        $value = $this->pushNotificationMessage($key, $type, $lang);
         if ($value != null) {
             $data = [
-                'title' => translate('your_account_has_been'.'_'.$status),
+                'title' => translate('your_account_has_been' . '_' . $status),
                 'description' => $value,
                 'image' => '',
                 'type' => 'block'
@@ -151,9 +153,10 @@ trait PushNotificationTrait
             $this->sendPushNotificationToDevice($fcmToken, $data);
         }
     }
-    protected function productRequestStatusUpdateNotification(string $key,string $type,string $lang,string $fcmToken):void
+
+    protected function productRequestStatusUpdateNotification(string $key, string $type, string $lang, string $fcmToken): void
     {
-        $value = $this->pushNotificationMessage($key,$type, $lang);
+        $value = $this->pushNotificationMessage($key, $type, $lang);
         if ($value != null) {
             $data = [
                 'title' => translate($key),
@@ -164,7 +167,8 @@ trait PushNotificationTrait
             $this->sendPushNotificationToDevice($fcmToken, $data);
         }
     }
-    protected function cashCollectNotification(string $key,string $type,string $lang,float $amount,string $fcmToken):void
+
+    protected function cashCollectNotification(string $key, string $type, string $lang, float $amount, string $fcmToken): void
     {
         $value = $this->pushNotificationMessage($key, $type, $lang);
         if ($value != null) {
@@ -253,6 +257,25 @@ trait PushNotificationTrait
         }
     }
 
+
+
+    protected function demoResetNotification(): void
+    {
+        try {
+            $data = [
+                'title' => translate('demo_reset_alert'),
+                'description' => translate('demo_data_is_being_reset_to_default') . '.',
+                'image' => '',
+                'order_id' => '',
+                'type' => 'demo_reset',
+            ];
+            $this->sendPushNotificationToTopic(data: $data, topic: $data['type']);
+        } catch (\Throwable $th) {
+            info('Failed_to_sent_demo_reset_notification');
+        }
+    }
+
+
     /**
      * Device wise notification send
      * @param string $fcmToken
@@ -262,108 +285,90 @@ trait PushNotificationTrait
 
     protected function sendPushNotificationToDevice(string $fcmToken, array $data): bool|string
     {
-        $key = getWebConfig(name: 'push_notification_key');
-        $url = "https://fcm.googleapis.com/fcm/send";
-        $header = array("authorization: key=" . $key . "",
-            "content-type: application/json"
-        );
-
-        if (isset($data['order_id']) == false) {
-            $data['order_id'] = null;
-        }
-
-        $postData = '{
-            "to" : "' . $fcmToken . '",
-            "data" : {
-                "title" :"' . $data['title'] . '",
-                "body" : "' . $data['description'] . '",
-                "image" : "' . $data['image'] . '",
-                "order_id":"' . $data['order_id'] . '",
-                "type":"' . $data['type'] . '",
-                "is_read": 0
-              },
-              "notification" : {
-                "title" :"' . $data['title'] . '",
-                "body" : "' . $data['description'] . '",
-                "image" : "' . $data['image'] . '",
-                "order_id":"' . $data['order_id'] . '",
-                "title_loc_key":"' . $data['order_id'] . '",
-                "type":"' . $data['type'] . '",
-                "is_read": 0,
-                "icon" : "new",
-                "sound" : "default"
-              }
-        }';
-
-        $ch = curl_init();
-        $timeout = 120;
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $timeout);
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, $header);
-
-        // Get URL content
-        $result = curl_exec($ch);
-        // close handle to release resources
-        curl_close($ch);
-
-        return $result;
+        $postData = [
+            'message' => [
+                'token' => $fcmToken,
+                'data' => [
+                    'title' => (string)$data['title'],
+                    'body' => (string)$data['description'],
+                    'image' => $data['image'],
+                    'order_id' =>(string)($data['order_id'] ?? ''),
+                    'type' => (string)$data['type'],
+                    'is_read' => '0'
+                ],
+                'notification' => [
+                    'title' => (string)$data['title'],
+                    'body' => (string)$data['description'],
+                ]
+            ]
+        ];
+        return $this->sendNotificationToHttp($postData);
     }
-
     /**
      * Device wise notification send
-     * @param array $data
+     * @param array|object $data
      * @param string $topic
      * @return bool|string
      */
     protected function sendPushNotificationToTopic(array|object $data, string $topic = 'sixvalley'): bool|string
     {
-        $key = getWebConfig(name: 'push_notification_key');
 
-        $url = "https://fcm.googleapis.com/fcm/send";
-        $header = ["authorization: key=" . $key . "",
-            "content-type: application/json",
+        $postData = [
+            'message' => [
+                'topic' => $topic,
+                'data' => [
+                    'title' => (string)$data['title'],
+                    'body' => (string)$data['description'],
+                    'image' => $data['image'],
+                    'order_id' => (string)$data['order_id'] ?? '',
+                    'type' => (string)$data['type'],
+                    'is_read' => '0'
+                ],
+                'notification' => [
+                    'title' => (string)$data['title'],
+                    'body' => (string)$data['description'],
+                ]
+            ]
         ];
-
-        $image = asset('storage/app/public/notification') . '/' . $data['image'];
-        $postData = '{
-            "to" : "/topics/' . $topic . '",
-            "data" : {
-                "title":"' . $data->title . '",
-                "body" : "' . $data->description . '",
-                "image" : "' . $image . '",
-                "type":"notification",
-                "is_read": 0
-              },
-              "notification" : {
-                "title":"' . $data->title . '",
-                "body" : "' . $data->description . '",
-                "image" : "' . $image . '",
-                "title_loc_key":null,
-                "type":"notification",
-                "is_read": 0,
-                "icon" : "new",
-                "sound" : "default"
-              }
-        }';
-
-        $ch = curl_init();
-        $timeout = 120;
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $timeout);
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, $header);
-
-        // Get URL content
-        $result = curl_exec($ch);
-        // close handle to release resources
-        curl_close($ch);
-
-        return $result;
+        return $this->sendNotificationToHttp($postData);
     }
 
+    protected function sendNotificationToHttp(array|null $data): bool|string|null
+    {
+        try {
+            $key = (array)getWebConfig('push_notification_key');
+            if (isset($key['project_id'])) {
+                $url = 'https://fcm.googleapis.com/v1/projects/' . $key['project_id'] . '/messages:send';
+                $headers = [
+                    'Authorization' => 'Bearer ' . $this->getAccessToken($key),
+                    'Content-Type' => 'application/json',
+                ];
+            }
+            return Http::withHeaders($headers)->post($url, $data);
+        } catch (\Exception $exception) {
+            return false;
+        }
+    }
+
+    protected function getAccessToken($key): string|null
+    {
+        $jwtToken = [
+            'iss' => $key['client_email'],
+            'scope' => 'https://www.googleapis.com/auth/firebase.messaging',
+            'aud' => 'https://oauth2.googleapis.com/token',
+            'exp' => time() + 3600,
+            'iat' => time(),
+        ];
+        $jwtHeader = base64_encode(json_encode(['alg' => 'RS256', 'typ' => 'JWT']));
+        $jwtPayload = base64_encode(json_encode($jwtToken));
+        $unsignedJwt = $jwtHeader . '.' . $jwtPayload;
+        openssl_sign($unsignedJwt, $signature, $key['private_key'], OPENSSL_ALGO_SHA256);
+        $jwt = $unsignedJwt . '.' . base64_encode($signature);
+
+        $response = Http::asForm()->post('https://oauth2.googleapis.com/token', [
+            'grant_type' => 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+            'assertion' => $jwt,
+        ]);
+        return $response->json('access_token') ?? null;
+    }
 }

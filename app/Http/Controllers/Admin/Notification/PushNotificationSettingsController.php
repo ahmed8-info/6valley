@@ -101,7 +101,7 @@ class PushNotificationSettingsController extends BaseController
             );
             foreach ($request->$lang as $index => $value) {
                 if ($request->$message[$index] && $value != 'en') {
-                    $this->translationRepo->updateDataForPushNotification(
+                    $this->translationRepo->updateData(
                         model: 'App\Models\NotificationMessage',
                         id: $pushNotificationMessage['id'],
                         lang: $value,

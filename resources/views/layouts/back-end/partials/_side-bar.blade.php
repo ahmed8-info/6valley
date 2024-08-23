@@ -8,18 +8,21 @@
     use App\Enums\ViewPaths\Admin\ShippingMethod;
     use App\Enums\ViewPaths\Admin\PaymentMethod;
     use App\Enums\ViewPaths\Admin\InvoiceSettings;
+    use App\Enums\ViewPaths\Admin\SEOSettings;
+    use App\Enums\ViewPaths\Admin\ErrorLogs;
+    use App\Enums\ViewPaths\Admin\StorageConnectionSettings;
     use App\Utils\Helpers;
-
+    use App\Enums\EmailTemplateKey;
+    $eCommerceLogo = getWebConfig(name: 'company_web_logo');
 @endphp
 <div id="sidebarMain" class="d-none">
     <aside class="bg-white js-navbar-vertical-aside navbar navbar-vertical-aside navbar-vertical navbar-vertical-fixed navbar-expand-xl navbar-bordered text-start">
         <div class="navbar-vertical-container">
             <div class="navbar-vertical-footer-offset pb-0">
                 <div class="navbar-brand-wrapper justify-content-between side-logo">
-                    @php($eCommerceLogo = getWebConfig(name: 'company_web_logo'))
                     <a class="navbar-brand" href="{{route('admin.dashboard.index')}}" aria-label="Front">
                         <img class="navbar-brand-logo-mini for-web-logo max-h-30"
-                             src="{{getValidImage('storage/app/public/company/'.$eCommerceLogo,type: 'backend-logo') }}" alt="{{translate('logo')}}">
+                             src="{{getStorageImages(path:$eCommerceLogo,type: 'backend-logo') }}" alt="{{translate('logo')}}">
                     </a>
                     <button type="button"
                             class="d-none js-navbar-vertical-aside-toggle-invoker navbar-vertical-aside-toggle btn btn-icon btn-xs btn-ghost-dark">
@@ -63,11 +66,11 @@
                             </li>
                         @endif
                         @if(Helpers::module_permission_check('order_management'))
-                            <li class="nav-item {{Request::is('admin/orders*')?'scroll-here':''}}">
+                            <li class="nav-item {{Request::is('admin/orders*')?((Request::is('admin/orders/details/*') && request()->has('vendor-order-list')) ? '' : 'scroll-here'):''}}">
                                 <small class="nav-subtitle" title="">{{translate('order_management')}}</small>
                                 <small class="tio-more-horizontal nav-subtitle-replacer"></small>
                             </li>
-                            <li class="navbar-vertical-aside-has-menu {{Request::is('admin/orders*')?'active':''}}">
+                            <li class="navbar-vertical-aside-has-menu {{Request::is('admin/orders*')?((Request::is('admin/orders/details/*') && request()->has('vendor-order-list')) ? '' : 'active'):''}}">
                                 <a class="js-navbar-vertical-aside-menu-link nav-link nav-link-toggle"
                                    href="javascript:" title="{{translate('orders')}}">
                                     <i class="tio-shopping-cart-outlined nav-icon"></i>
@@ -76,7 +79,7 @@
                                     </span>
                                 </a>
                                 <ul class="js-navbar-vertical-aside-submenu nav nav-sub"
-                                    style="display: {{Request::is('admin/order*')?'block':'none'}}">
+                                    style="display: {{Request::is('admin/order*')?((Request::is('admin/orders/details/*') && request()->has('vendor-order-list')) ? '' : 'block'):'none'}}">
                                     <li class="nav-item {{Request::is('admin/orders/'.Order::LIST[URI].'/all') ? 'active':''}}">
                                         <a class="nav-link" href="{{route('admin.orders.list',['all'])}}"
                                            title="{{translate('all')}}">
@@ -512,7 +515,7 @@
                                 </a>
                                 <ul class="js-navbar-vertical-aside-submenu nav nav-sub"
                                     style="display: {{(Request::is('admin/notification*') || Request::is('admin/push-notification/*')) ? 'block':'none'}}">
-                                    <li class="navbar-vertical-aside-has-menu {{!Request::is('admin/notification/push') && Request::is('admin/notification*')?'active':''}}">
+                                    <li class="navbar-vertical-aside-has-menu {{!Request::is('admin/notification/push') && Request::is('admin/notification/*')?'active':''}}">
                                         <a class="js-navbar-vertical-aside-menu-link nav-link"
                                            href="{{route('admin.notification.index')}}"
                                            title="{{translate('send_notification')}}">
@@ -780,15 +783,14 @@
                                 </ul>
                             </li>
 
-                            <li class="navbar-vertical-aside-has-menu {{ Request::is('admin/vendors*') || Request::is('admin/vendors/withdraw-method/*') ? 'active' : '' }}">
+                            <li class="navbar-vertical-aside-has-menu {{ Request::is('admin/vendors*') || Request::is('admin/vendors/withdraw-method/*') || (Request::is('admin/orders/details/*') && request()->has('vendor-order-list')) ? 'active' : '' }}">
                                 <a class="js-navbar-vertical-aside-menu-link nav-link nav-link-toggle"
                                    href="javascript:" title="{{translate('vendors')}}">
                                     <i class="tio-users-switch nav-icon"></i>
-                                    <span
-                                        class="navbar-vertical-aside-mini-mode-hidden-elements text-truncate">{{translate('vendors')}}</span>
+                                    <span class="navbar-vertical-aside-mini-mode-hidden-elements text-truncate">{{translate('vendors')}}</span>
                                 </a>
                                 <ul class="js-navbar-vertical-aside-submenu nav nav-sub"
-                                    style="display: {{Request::is('admin/vendors*')?'block':'none'}}">
+                                    style="display: {{Request::is('admin/vendors*') || (Request::is('admin/orders/details/*') && request()->has('vendor-order-list'))?'block':'none'}}">
                                     <li class="nav-item {{Request::is('admin/vendors/'.Vendor::ADD[URI])?'active':''}}">
                                         <a class="nav-link" title="{{translate('add_New_Vendor')}}"
                                            href="{{route('admin.vendors.add')}}">
@@ -932,6 +934,11 @@
                                 Request::is('admin/business-settings/shipping-method/'.ShippingMethod::INDEX[URI]) ||
                                 Request::is('admin/business-settings/delivery-restriction') ||
                                 Request::is('admin/business-settings/invoice-settings') ||
+                                Request::is('admin/seo-settings/'.SEOSettings::WEB_MASTER_TOOL[URI]) ||
+                                Request::is('admin/seo-settings/'.SEOSettings::ROBOT_TXT[URI]) ||
+                                Request::is('admin/seo-settings/'.SiteMap::SITEMAP[URI]) ||
+                                Request::is('admin/seo-settings/robots-meta-content*') ||
+                                Request::is('admin/error-logs/'.ErrorLogs::INDEX[URI]) ||
                                 Request::is('admin/addon')) ? 'scroll-here' : '' }}">
 
                                 <small class="nav-subtitle"
@@ -961,6 +968,12 @@
                                         Request::is('admin/business-settings/order-settings/index') ||
                                         Request::is('admin/'.BusinessSettings::PRODUCT_SETTINGS[URI]) ||
                                         Request::is('admin/business-settings/invoice-settings') ||
+                                        Request::is('admin/business-settings/priority-setup')||
+                                        Request::is('admin/seo-settings/'.SEOSettings::WEB_MASTER_TOOL[URI]) ||
+                                        Request::is('admin/seo-settings/'.SEOSettings::ROBOT_TXT[URI]) ||
+                                        Request::is('admin/seo-settings/'.SiteMap::SITEMAP[URI]) ||
+                                        Request::is('admin/seo-settings/robots-meta-content*') ||
+                                        Request::is('admin/error-logs/'.ErrorLogs::INDEX[URI]) ||
                                         Request::is('admin/business-settings/delivery-restriction'))?'block':'none'}}">
                                     <li class="nav-item {{(
                                             Request::is('admin/business-settings/web-config') ||
@@ -974,6 +987,7 @@
                                             Request::is('admin/business-settings/order-settings/index') ||
                                             Request::is('admin/'.BusinessSettings::PRODUCT_SETTINGS[URI]) ||
                                             Request::is('admin/business-settings/invoice-settings') ||
+                                            Request::is('admin/business-settings/priority-setup') ||
                                             Request::is('admin/business-settings/delivery-restriction'))?'active':''}}">
                                         <a class="nav-link" href="{{route('admin.business-settings.web-config.index')}}"
                                            title="{{translate('business_Settings')}}">
@@ -992,6 +1006,21 @@
                                             </span>
                                         </a>
                                     </li>
+                                    <li class="nav-item {{
+                                        (Request::is('admin/seo-settings/'.SEOSettings::WEB_MASTER_TOOL[URI]) ||
+                                        Request::is('admin/seo-settings/'.SEOSettings::ROBOT_TXT[URI]) ||
+                                        Request::is('admin/seo-settings/'.SiteMap::SITEMAP[URI]) ||
+                                        Request::is('admin/seo-settings/robots-meta-content*') ||
+                                        Request::is('admin/error-logs/'.ErrorLogs::INDEX[URI])) ? 'active' : ''
+                                    }}">
+                                        <a class="nav-link" href="{{ route('admin.seo-settings.web-master-tool') }}"
+                                           title="{{ translate('SEO_Settings') }}">
+                                            <span class="tio-circle nav-indicator-icon"></span>
+                                            <span class="text-truncate">
+                                              {{ translate('SEO_Settings') }}
+                                            </span>
+                                        </a>
+                                    </li>
                                 </ul>
                             </li>
                             <li class="navbar-vertical-aside-has-menu ">
@@ -1005,7 +1034,7 @@
                                 <ul class="js-navbar-vertical-aside-submenu nav nav-sub"
                                     style="display: {{(
                                         Request::is('admin/business-settings/web-config/'.EnvironmentSettings::VIEW[URI]) ||
-                                        Request::is('admin/business-settings/web-config/'.SiteMap::VIEW[URI]) ||
+                                        Request::is('admin/business-settings/web-config/'.SiteMap::SITEMAP[URI]) ||
                                         Request::is('admin/currency/'.Currency::LIST[URI]) ||
                                         Request::is('admin/currency/'.Currency::UPDATE[URI].'*') ||
                                         Request::is('admin/business-settings/web-config/'.DatabaseSetting::VIEW[URI]) ||
@@ -1016,10 +1045,11 @@
                                         Request::is('admin/business-settings/'.BusinessSettings::COOKIE_SETTINGS[URI]) ||
                                         Request::is('admin/business-settings/'.BusinessSettings::OTP_SETUP[URI]) ||
                                         Request::is('admin/business-settings/web-config/'.BusinessSettings::APP_SETTINGS[URI]) ||
+                                        Request::is('admin/business-settings/email-templates/*')  ||
                                         Request::is('admin/addon'))?'block':'none'}}">
                                     <li class="nav-item {{(
                                             Request::is('admin/business-settings/web-config/'.EnvironmentSettings::VIEW[URI]) ||
-                                            Request::is('admin/business-settings/web-config/'.SiteMap::VIEW[URI]) ||
+                                            Request::is('admin/business-settings/web-config/'.SiteMap::SITEMAP[URI]) ||
                                             Request::is('admin/currency/'.Currency::LIST[URI]) ||
                                             Request::is('admin/currency/'.Currency::UPDATE[URI].'*') ||
                                             Request::is('admin/business-settings/web-config/'.DatabaseSetting::VIEW[URI]) ||
@@ -1060,6 +1090,15 @@
                                             </span>
                                         </a>
                                     </li>
+                                    <li class="nav-item {{Request::is('admin/business-settings/email-templates/*') ? 'active' : ''}}">
+                                        <a class="nav-link" href="{{route('admin.business-settings.email-templates.view',['admin',EmailTemplateKey::ADMIN_EMAIL_LIST[0]])}}"
+                                           title="{{translate('in-house_Shop')}}">
+                                            <span class="tio-circle nav-indicator-icon"></span>
+                                            <span class="text-truncate text-capitalize">
+                                              {{translate('email_template')}}
+                                            </span>
+                                        </a>
+                                    </li>
                                 </ul>
                             </li>
 
@@ -1081,6 +1120,7 @@
                                             Request::is('admin/business-settings/'.GoogleMapAPI::VIEW[URI]) ||
                                             Request::is('admin/business-settings/payment-method') ||
                                             Request::is('admin/business-settings/'.BusinessSettings::ANALYTICS_INDEX[URI]) ||
+                                            Request::is('admin/storage-connection-settings/'.StorageConnectionSettings::INDEX[URI]) ||
                                             Request::is('admin/business-settings/payment-method/offline-payment*') ? 'block':'none' }}">
                                     <li class="nav-item {{
                                             Request::is('admin/business-settings/payment-method') ||
@@ -1103,6 +1143,7 @@
                                         Request::is('admin/social-login/'.SocialLoginSettings::VIEW[URI]) ||
                                         Request::is('admin/social-media-chat/'.SocialMediaChat::VIEW[URI]) ||
                                         Request::is('admin/business-settings/'.BusinessSettings::ANALYTICS_INDEX[URI]) ||
+                                        Request::is('admin/storage-connection-settings/'.StorageConnectionSettings::INDEX[URI]) ||
                                         Request::is('admin/business-settings/'.GoogleMapAPI::VIEW[URI])?'active':''}}
                                     ">
                                         <a class="js-navbar-vertical-aside-menu-link nav-link"
@@ -1124,6 +1165,7 @@
                                 Request::is('admin/business-settings/'.Pages::ABOUT_US[URI]) ||
                                 Request::is('admin/helpTopic/'.HelpTopic::LIST[URI]) ||
                                 Request::is('admin/business-settings/'.FeaturesSection::VIEW[URI]) ||
+                                Request::is('admin/business-settings/vendor-registration-settings/*') ||
                                 Request::is('admin/business-settings/'.FeaturesSection::COMPANY_RELIABILITY[URI])) ?'active':''}}">
                                 <a class="js-navbar-vertical-aside-menu-link nav-link nav-link-toggle"
                                    href="javascript:" title="{{translate('Pages_&_Media')}}">
@@ -1133,7 +1175,7 @@
                                     </span>
                                 </a>
                                 <ul class="js-navbar-vertical-aside-submenu nav nav-sub"
-                                    style="display: {{Request::is('admin/business-settings/terms-condition') || Request::is('admin/business-settings/page*') || Request::is('admin/business-settings/privacy-policy') || Request::is('admin/business-settings/about-us') || Request::is('admin/helpTopic/list') || Request::is('admin/business-settings/social-media') || Request::is('admin/file-manager*') || Request::is('admin/business-settings/features-section')?'block':'none'}}">
+                                    style="display: {{Request::is('admin/business-settings/terms-condition') || Request::is('admin/business-settings/page*') || Request::is('admin/business-settings/privacy-policy') || Request::is('admin/business-settings/about-us') || Request::is('admin/helpTopic/list') || Request::is('admin/business-settings/social-media') || Request::is('admin/file-manager*') || Request::is('admin/business-settings/features-section') || Request::is('admin/business-settings/vendor-registration-settings/*')?'block':'none'}}">
                                     <li class="nav-item {{(
                                         Request::is('admin/business-settings/'.Pages::TERMS_CONDITION[URI]) ||
                                         Request::is('admin/business-settings/'.Pages::VIEW[URI].'*') ||
@@ -1167,8 +1209,18 @@
                                            title="{{translate('gallery')}}">
                                             <span class="tio-circle nav-indicator-icon"></span>
                                             <span class="navbar-vertical-aside-mini-mode-hidden-elements text-truncate">
-                                        {{translate('gallery')}}
-                                    </span>
+                                                {{translate('gallery')}}
+                                            </span>
+                                        </a>
+                                    </li>
+                                    <li class="navbar-vertical-aside-has-menu {{Request::is('admin/business-settings/vendor-registration-settings/*')?'active':''}}">
+                                        <a class="js-navbar-vertical-aside-menu-link nav-link"
+                                           href="{{route('admin.business-settings.vendor-registration-settings.index')}}"
+                                           title="{{translate('vendor_Registration')}}">
+                                            <span class="tio-circle nav-indicator-icon"></span>
+                                            <span class="navbar-vertical-aside-mini-mode-hidden-elements text-truncate">
+                                                {{translate('vendor_Registration')}}
+                                            </span>
                                         </a>
                                     </li>
                                 </ul>

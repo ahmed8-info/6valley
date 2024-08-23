@@ -87,7 +87,13 @@ class RefundRequestExport implements FromView, ShouldAutoSize, WithStyles,WithCo
                     ->getAlignment()
                     ->setHorizontal(Alignment::HORIZONTAL_LEFT)
                     ->setVertical(Alignment::VERTICAL_CENTER);
-
+                if(isset($this->data['data-from']) && $this->data['data-from'] == 'vendor'){
+                    $event->sheet->mergeCells('I3:J3');
+                    $this->data['refundList']->each(function($item,$index) use($event) {
+                        $index+=4;
+                        $event->sheet->mergeCells("I$index:J$index");
+                    });
+                }
                     $event->sheet->mergeCells('A1:J1');
                     $event->sheet->mergeCells('A2:B2');
                     $event->sheet->mergeCells('C2:J2');

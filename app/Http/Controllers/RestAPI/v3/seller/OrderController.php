@@ -11,13 +11,14 @@ use App\Models\DeliveryZipCode;
 use App\Models\Order;
 use App\Models\OrderDetail;
 use App\Traits\CommonTrait;
-use App\User;
+use App\Models\User;
 use App\Utils\BackEndHelper;
 use App\Utils\Convert;
 use App\Utils\CustomerManager;
 use App\Utils\Helpers;
 use App\Utils\ImageManager;
 use App\Utils\OrderManager;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -38,20 +39,32 @@ class OrderController extends Controller
         $seller = $request->seller;
         $status = $request->status;
 
-        $orders = Order::with('offlinePayments')->with(['customer','shipping', 'deliveryMan'])
-            ->when($status !='all', function($q) use($status){
-                $q->where(function($query) use ($status){
-                    $query->orWhere('order_status',$status);
+        $orders = Order::with('offlinePayments')->with(['customer', 'shipping', 'deliveryMan', 'orderDetails'])
+            ->when($status != 'all', function ($q) use ($status) {
+                $q->where(function ($query) use ($status) {
+                    $query->orWhere('order_status', $status);
                 });
             })
-            ->where(['seller_is'=>'seller', 'seller_id' => $seller['id']])
+            ->where(['seller_is' => 'seller', 'seller_id' => $seller['id']])
             ->latest()
             ->paginate($request['limit'], ['*'], 'page', $request['offset']);
 
-        $orders->map(function ($data) {
-            if(isset($data['offlinePayments'])){
+        $orders?->map(function ($data) {
+            if (isset($data['offlinePayments'])) {
                 $data['offlinePayments']->payment_info = $data->offlinePayments->payment_info;
             }
+
+            $totalTaxAmount = 0;
+            $totalProductPrice = 0;
+            $totalProductDiscount = 0;
+            if (isset($data['orderDetails']) && count($data['orderDetails']) > 0) {
+                $totalTaxAmount = $data['orderDetails']->sum('tax');
+                $totalProductPrice = $data['orderDetails']->sum('price');
+                $totalProductDiscount = $data['orderDetails']->sum('discount');
+            }
+            $data['total_tax_amount'] = $totalTaxAmount;
+            $data['total_product_price'] = $totalProductPrice;
+            $data['total_product_discount'] = $totalProductDiscount;
             return $data;
         });
 
@@ -63,16 +76,21 @@ class OrderController extends Controller
         ], 200);
     }
 
-    public function details(Request $request, $id)
+    public function details(Request $request, $id): JsonResponse
     {
         $seller = $request->seller;
-
-        $details = OrderDetail::with('order.customer','order.deliveryMan','verificationImages')->where(['seller_id' => $seller['id'], 'order_id' => $id])->get();
-        foreach ($details as $det) {
-            $det['product_details'] = Helpers::product_data_formatting(json_decode($det['product_details'], true));
+        $detailsList = OrderDetail::with('order.customer','order.deliveryMan','verificationImages')->where(['seller_id' => $seller['id'], 'order_id' => $id])->get();
+        foreach ($detailsList as $detail) {
+            $product = json_decode($detail['product_details'], true);
+            $product['thumbnail_full_url'] = $detail?->productAllStatus?->thumbnail_full_url;
+            if ($product['product_type'] == 'digital' && $product['digital_product_type'] == 'ready_product' && $product['digital_file_ready']) {
+                $checkFilePath = storageLink('product/digital-product', $product['digital_file_ready'], ($product['storage_path'] ?? 'public'));
+                $product['digital_file_ready_full_url'] = $checkFilePath;
+            }
+            $detail['product_details'] = Helpers::product_data_formatting_for_json_data($product);
         }
 
-        return response()->json($details, 200);
+        return response()->json($detailsList, 200);
     }
 
     public function assign_delivery_man(Request $request)

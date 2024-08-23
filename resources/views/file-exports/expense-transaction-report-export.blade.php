@@ -9,6 +9,10 @@
         <th></th>
         <th>
             {{translate('search_Bar_Content').' '.'-'.' '. ($data['search'] ?? 'N/A')}}
+            @if(isset($data['vendor']))
+            <br>
+                {{translate('store_Name')}} - {{$data['vendor']?->shop?->name}}
+            @endif
             <br>
             {{translate('date_type').' '.'-'.' '.translate($data['dateType'])}}
             <br>
@@ -34,15 +38,17 @@
             <td>{{ $transaction->orderTransaction->transaction_id }}</td>
             <td>{{ date_format($transaction?->orderTransaction->updated_at, 'd F Y h:i:s a') }}</td>
             <td>{{$transaction->id}}</td>
-            <td>{{ setCurrencySymbol(amount: usdToDefaultCurrency(amount: ($transaction->coupon_discount_bearer == 'inhouse'?$transaction->discount_amount:0) + ($transaction->free_delivery_bearer=='admin'?$transaction->extra_discount:0)), currencyCode: getCurrencyCode()) }}</td>
+            <td>{{ setCurrencySymbol(amount: usdToDefaultCurrency(amount: ($transaction->coupon_discount_bearer == 'inhouse'? $transaction->discount_amount:0) + ($transaction->free_delivery_bearer=='admin'?$transaction->extra_discount:(($transaction->coupon_discount_bearer == 'seller'?$transaction->discount_amount:0) + ($transaction->free_delivery_bearer=='seller'?$transaction->extra_discount:0)))), currencyCode: getCurrencyCode()) }}</td>
             <td>
-                @php($transactionCouponType = ($transaction->coupon_discount_bearer == 'inhouse'?(isset($transaction->coupon->coupon_type) ? ($transaction->coupon->coupon_type == 'free_delivery' ? translate('free_Delivery_Promotion'): ucwords(str_replace('_', ' ', $transaction->coupon->coupon_type))) : ''):'') )
-                @php($extraDiscountType = ($transaction->free_delivery_bearer == 'admin' ? ucwords(str_replace('_', ' ', $transaction->extra_discount_type)):'' ))
+                @php($transactionCouponType = ($transaction->coupon_discount_bearer == 'inhouse'?(isset($transaction->coupon->coupon_type) ? ($transaction->coupon->coupon_type == 'free_delivery' ? translate('free_Delivery_Promotion'): (ucwords(str_replace('_', ' ', $transaction->coupon->coupon_type))) ): ''):($transaction->coupon_discount_bearer == 'seller'?(isset($transaction->coupon->coupon_type) ? ($transaction->coupon->coupon_type == 'free_delivery' ? 'Free Delivery Promotion':ucwords(str_replace('_', ' ', $transaction->coupon->coupon_type))) : ''):'')) )
+                @php($extraDiscountType = ($transaction->free_delivery_bearer == 'admin' ? ucwords(str_replace('_', ' ', $transaction->extra_discount_type)):($transaction->free_delivery_bearer == 'seller' ? ucwords(str_replace('_', ' ', $transaction->extra_discount_type)):'' ) ))
                 @if(!empty($transactionCouponType))
                     {{$transactionCouponType}}
-                    <br>
                 @endif
-                {{$extraDiscountType}}
+                @if(!empty($extraDiscountType))
+                    <br>
+                    {{$extraDiscountType}}
+                @endif
             </td>
         </tr>
     @endforeach

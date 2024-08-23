@@ -47,6 +47,10 @@ enum Customer
         URI => 'customer-list-search',
         VIEW => ''
     ];
+    const SEARCH_WITHOUT_ALL_CUSTOMER = [
+        URI => 'customer-list-without-all-customer',
+        VIEW => ''
+    ];
 
     const SETTINGS = [
         URI => 'customer-settings',

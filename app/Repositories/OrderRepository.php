@@ -87,9 +87,10 @@ class OrderRepository implements OrderRepositoryInterface
                         return $query;
                     })
                     ->when($filters['filter'] == 'POS', function ($query) {
-                        return $query->whereHas('details', function ($query) {
-                            return $query->where('order_type', 'POS');
-                        });
+                        return $query->where('order_type', 'POS');
+                    })
+                    ->when($filters['filter'] == 'default_type', function ($query) {
+                        return $query->where('order_type', 'default_type');
                     })
                     ->when($filters['filter'] == 'admin' || $filters['filter'] == 'seller', function ($query) use ($filters) {
                         return $query->whereHas('details', function ($query) use ($filters) {

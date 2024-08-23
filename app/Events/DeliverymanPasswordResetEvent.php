@@ -17,7 +17,7 @@ class DeliverymanPasswordResetEvent
     /**
      * Create a new event instance.
      */
-    public function __construct(public readonly string $email, public int $otp)
+    public function __construct(public readonly string $email,public readonly array $data)
     {}
 
     /**

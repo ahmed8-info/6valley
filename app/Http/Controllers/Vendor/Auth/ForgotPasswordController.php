@@ -7,15 +7,13 @@ use App\Contracts\Repositories\VendorRepositoryInterface;
 use App\Enums\SessionKey;
 use App\Enums\ViewPaths\Vendor\Auth;
 use App\Enums\ViewPaths\Vendor\ForgotPassword;
+use App\Events\PasswordResetEvent;
 use App\Http\Controllers\BaseController;
 use App\Http\Requests\Vendor\PasswordResetRequest;
 use App\Http\Requests\Vendor\VendorPasswordRequest;
 use App\Services\PasswordResetService;
+use App\Traits\EmailTemplateTrait;
 use App\Traits\SmsGateway;
-use App\Models\Seller;
-use App\Utils\Helpers;
-use App\Utils\SMS_module;
-use App\Http\Controllers\Controller;
 use Brian2694\Toastr\Facades\Toastr;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
@@ -23,13 +21,12 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Modules\Gateways\Traits\SmsGateway as AddonSmsGateway;
 
 class ForgotPasswordController extends BaseController
 {
-    use SmsGateway;
+    use SmsGateway,EmailTemplateTrait;
 
     /**
      * @param VendorRepositoryInterface $vendorRepo
@@ -79,7 +76,15 @@ class ForgotPasswordController extends BaseController
                 $this->passwordResetRepo->add($this->passwordResetService->getAddData(identity:$request['identity'],token: $token,userType:'seller'));
                 $resetUrl = url('/') . '/'.ForgotPassword::RESET_PASSWORD[URL].'?token=' . $token;
                 try {
-                    Mail::to($vendor['email'])->send(new \App\Mail\PasswordResetMail($resetUrl));
+                    $data = [
+                        'userType' => 'vendor',
+                        'templateName' => 'forgot-password',
+                        'vendorName' => $vendor['f_name'],
+                        'subject' => translate('password_reset'),
+                        'title' => translate('password_reset'),
+                        'passwordResetURL' => $resetUrl,
+                    ];
+                    event(new PasswordResetEvent(email: $vendor['email'],data: $data));
                 }catch (\Exception $exception){
                     return response()->json(['error'=>translate('email_send_fail').'!!']);
                 }

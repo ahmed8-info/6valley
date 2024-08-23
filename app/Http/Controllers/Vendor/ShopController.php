@@ -17,6 +17,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Cache;
 
 class ShopController extends BaseController
 {
@@ -106,6 +107,8 @@ class ShopController extends BaseController
     public function closeShopTemporary(Request $request, string|int $id):JsonResponse
      {
          $this->shopRepo->update(id: $id, data: ['temporary_close' => $request->get(key: 'status', default: 0)]);
+
+         Cache::clear();
          return response()->json([
              'status' => true,
              'message' => $request['status'] ? translate("temporary_close_active_successfully") : translate("temporary_close_inactive_successfully"),

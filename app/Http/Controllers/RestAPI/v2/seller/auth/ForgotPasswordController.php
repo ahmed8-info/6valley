@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\RestAPI\v2\seller\auth;
 
-use App\Events\PasswordResetMailEvent;
+use App\Events\PasswordResetEvent;
 use App\Http\Controllers\Controller;
 use App\Models\Seller;
 use App\Utils\Helpers;
@@ -45,7 +45,15 @@ class ForgotPasswordController extends Controller
                     $emailServices_smtp = Helpers::get_business_settings('mail_config_sendgrid');
                 }
                 if ($emailServices_smtp['status'] == 1) {
-                    PasswordResetMailEvent::dispatch($seller['email'], $reset_url);
+                    $data = [
+                        'userType' => 'vendor',
+                        'templateName' => 'forgot-password',
+                        'vendorName' => $seller['f_name'],
+                        'subject' => translate('password_reset'),
+                        'title' => translate('password_reset'),
+                        'passwordResetURL' => $reset_url,
+                    ];
+                    event(new PasswordResetEvent(email: $seller['email'],data: $data));
                     $response = translate('check_your_email');
                 }else{
                     $response= translate('email_failed');

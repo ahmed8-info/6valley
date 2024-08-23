@@ -54,7 +54,7 @@ class TranslationRepository implements TranslationRepositoryInterface
         }
         return true;
     }
-    public function updateDataForPushNotification(string $model,string $id,string $lang, string $key, string $value):bool
+    public function updateData(string $model, string $id, string $lang, string $key, string $value):bool
     {
         $this->translation->updateOrInsert(
             [

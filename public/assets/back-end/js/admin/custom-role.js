@@ -30,6 +30,7 @@ function checkboxSelectionCheck() {
             nonEmptyCount++;
         }
     });
+
     let selectAll = $("#select-all");
     if (nonEmptyCount === 0) {
         selectAll.prop("checked", true);

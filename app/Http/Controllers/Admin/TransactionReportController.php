@@ -15,7 +15,7 @@ use App\Models\OrderTransaction;
 use App\Models\Product;
 use App\Models\Seller;
 use App\Models\Shop;
-use App\User;
+use App\Models\User;
 use App\Utils\BackEndHelper;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
@@ -130,7 +130,7 @@ class TransactionReportController extends Controller
         $to = $request['to'];
         $dateType = $request['date_type'] ?? 'this_year';
         $vendor = $request['seller_id']!='all' ? $this->vendorRepo->getFirstWhere(params:['id' => $request['seller_id']]):'all';
-        $customer = $request['customer_id'] !='all' ? $this->customerRepo->getFirstWhere(params:['id' => $request['customer_id']]):'all';
+        $customer =  isset($request['customer_id']) && $request['customer_id'] !='all' ? $this->customerRepo->getFirstWhere(params:['id' => $request['customer_id']]):'all';
         $transactions = self::order_transaction_table_data_filter($request)->latest('updated_at')->get();
         $transactions->map(function ($transaction) {
             $transaction['adminCouponDiscount'] = ($transaction->order->coupon_discount_bearer == 'inhouse' && $transaction->order->discount_type == 'coupon_discount') ? $transaction->order->discount_amount : 0;
@@ -188,6 +188,7 @@ class TransactionReportController extends Controller
             $transaction['vendorNetIncome'] = $vendorNetIncome;
         });
         $data = [
+            'data-from' => 'admin',
             'search' => $search,
             'from' => $from,
             'to' => $to,
@@ -208,7 +209,7 @@ class TransactionReportController extends Controller
         $company_phone = BusinessSetting::where('type', 'company_phone')->first()->value;
         $company_email = BusinessSetting::where('type', 'company_email')->first()->value;
         $company_name = BusinessSetting::where('type', 'company_name')->first()->value;
-        $company_web_logo = BusinessSetting::where('type', 'company_web_logo')->first()->value;
+        $company_web_logo = getWebConfig('company_web_logo');
 
         $from = $request['from'];
         $to = $request['to'];
@@ -256,10 +257,10 @@ class TransactionReportController extends Controller
                 $seller_shipping_discount = ($transaction->order->is_shipping_free && $transaction->order->free_delivery_bearer=='seller') ? $transaction->order->extra_discount : 0;
                 $total_seller_shipping_discount += $seller_shipping_discount;
 
-                $total_ordered_product_price += $transaction->orderDetails[0]->order_details_sum_price;
-                $total_product_discount += $transaction->orderDetails[0]->order_details_sum_discount;
+                $total_ordered_product_price += $transaction->orderDetails[0]?->order_details_sum_price??0;
+                $total_product_discount += $transaction->orderDetails[0]?->order_details_sum_discount ??0;
                 $total_coupon_discount += $transaction->order->discount_amount;
-                $total_discounted_amount += $transaction->orderDetails[0]->order_details_sum_price - $transaction->orderDetails[0]->order_details_sum_discount - (isset($transaction->order->coupon) && $transaction->order->coupon->coupon_type != 'free_delivery'?$transaction->order->discount_amount:0);
+                $total_discounted_amount += ($transaction->orderDetails[0]?->order_details_sum_price??0) - ($transaction->orderDetails[0]?->order_details_sum_discount??0) - (isset($transaction->order->coupon) && $transaction->order->coupon->coupon_type != 'free_delivery'?$transaction->order->discount_amount:0);
                 $total_tax += $transaction->tax;
                 $total_delivery_charge += $transaction->order->shipping_cost;
                 $total_order_amount += $transaction->order->order_amount;
@@ -393,7 +394,7 @@ class TransactionReportController extends Controller
         $company_phone = BusinessSetting::where('type', 'company_phone')->first()->value;
         $company_email = BusinessSetting::where('type', 'company_email')->first()->value;
         $company_name = BusinessSetting::where('type', 'company_name')->first()->value;
-        $company_web_logo = BusinessSetting::where('type', 'company_web_logo')->first()->value;
+        $company_web_logo = getWebConfig('company_web_logo');
 
         $transaction = OrderTransaction::with(['seller.shop', 'customer', 'order', 'orderDetails'])
             ->withSum('orderDetails', 'price')
@@ -741,9 +742,14 @@ class TransactionReportController extends Controller
                 'coupon_discount_bearer'=> 'inhouse',
                 'order_status'=>'delivered'
             ])
-            ->whereNotIn('coupon_code', ['0', 'NULL'])
-            ->orWhere(function($query){
-                $query->where(['extra_discount_type'=>'free_shipping_over_order_amount', 'free_delivery_bearer'=>'admin']);
+            ->where(function($query) {
+                $query->whereNotIn('coupon_code', ['0', 'NULL'])
+                    ->orWhere(function($query) {
+                        $query->where([
+                            'extra_discount_type'=>'free_shipping_over_order_amount',
+                            'free_delivery_bearer'=>'seller'
+                        ]);
+                    });
             })
             ->whereHas('orderTransaction', function ($query) use($search){
                 $query->where(['status'=>'disburse']);
@@ -774,9 +780,14 @@ class TransactionReportController extends Controller
                 'coupon_discount_bearer'=> 'inhouse',
                 'order_status'=>'delivered'
             ])
-            ->whereNotIn('coupon_code', ['0', 'NULL'])
-            ->orWhere(function($query){
-                $query->where(['extra_discount_type'=>'free_shipping_over_order_amount', 'free_delivery_bearer'=>'admin']);
+            ->where(function($query) {
+                $query->whereNotIn('coupon_code', ['0', 'NULL'])
+                    ->orWhere(function($query) {
+                        $query->where([
+                            'extra_discount_type'=>'free_shipping_over_order_amount',
+                            'free_delivery_bearer'=>'seller'
+                        ]);
+                    });
             })
             ->whereHas('orderTransaction', function ($query) use($search){
                 $query->where(['status'=>'disburse'])
@@ -806,14 +817,20 @@ class TransactionReportController extends Controller
                 'order_status'=>'delivered',
                 'order_type'=> 'default_type',
             ])
-            ->whereNotIn('coupon_code', ['0', 'NULL'])
-            ->orWhere(function($query){
-                $query->where(['extra_discount_type'=>'free_shipping_over_order_amount', 'free_delivery_bearer'=>'admin']);
+            ->where(function($query) {
+                $query->whereNotIn('coupon_code', ['0', 'NULL'])
+                    ->orWhere(function($query) {
+                        $query->where([
+                            'extra_discount_type'=>'free_shipping_over_order_amount',
+                            'free_delivery_bearer'=>'seller'
+                        ]);
+                    });
             })
             ->whereHas('orderTransaction', function ($query) use($search){
                 $query->where(['status'=>'disburse'])
                     ->when($search, function ($q) use ($search) {
-                        $q->where('transaction_id', 'like', "%{$search}%");
+                        $q->where('order_id', 'like', "%{$search}%")
+                            ->orWhere('transaction_id', 'like', "%{$search}%");
                     });
             });
         $transactions = self::date_wise_common_filter($expense_transaction_query, $dateType, $from, $to)->latest('updated_at')->get();
@@ -832,11 +849,10 @@ class TransactionReportController extends Controller
      */
     public function expense_transaction_summary_pdf(Request $request)
     {
-
         $company_phone = BusinessSetting::where('type', 'company_phone')->first()->value;
         $company_email = BusinessSetting::where('type', 'company_email')->first()->value;
         $company_name = BusinessSetting::where('type', 'company_name')->first()->value;
-        $company_web_logo = BusinessSetting::where('type', 'company_web_logo')->first()->value;
+        $company_web_logo = getWebConfig('company_web_logo');
 
         $search = $request['search'];
         $from = $request['from'];
@@ -854,14 +870,20 @@ class TransactionReportController extends Controller
                 'coupon_discount_bearer'=> 'inhouse',
                 'order_status'=>'delivered'
             ])
-            ->whereNotIn('coupon_code', ['0', 'NULL'])
-            ->orWhere(function($query){
-                $query->where(['extra_discount_type'=>'free_shipping_over_order_amount', 'free_delivery_bearer'=>'admin']);
+            ->where(function($query) {
+                $query->whereNotIn('coupon_code', ['0', 'NULL'])
+                    ->orWhere(function($query) {
+                        $query->where([
+                            'extra_discount_type'=>'free_shipping_over_order_amount',
+                            'free_delivery_bearer'=>'seller'
+                        ]);
+                    });
             })
             ->whereHas('orderTransaction', function ($query) use($search){
                 $query->where(['status'=>'disburse'])
                     ->when($search, function ($q) use ($search) {
-                        $q->where('transaction_id', 'like', "%{$search}%");
+                        $q->where('order_id', 'like', "%{$search}%")
+                            ->orWhere('transaction_id', 'like', "%{$search}%");
                     });
             });
         $expense_transactions = self::date_wise_common_filter($expense_transaction_query, $date_type, $from, $to)->get();
@@ -905,7 +927,7 @@ class TransactionReportController extends Controller
         $company_phone = BusinessSetting::where('type', 'company_phone')->first()->value;
         $company_email = BusinessSetting::where('type', 'company_email')->first()->value;
         $company_name = BusinessSetting::where('type', 'company_name')->first()->value;
-        $company_web_logo = BusinessSetting::where('type', 'company_web_logo')->first()->value;
+        $company_web_logo = getWebConfig('company_web_logo');
 
         $transaction = Order::with(['orderTransaction', 'coupon'])
             ->where('id', $request->id)->first();
@@ -1099,9 +1121,14 @@ class TransactionReportController extends Controller
             'coupon_discount_bearer'=> 'inhouse',
             'order_status'=>'delivered'
         ])
-            ->whereNotIn('coupon_code', ['0', 'NULL'])
-            ->orWhere(function($query){
-                $query->where(['extra_discount_type'=>'free_shipping_over_order_amount', 'free_delivery_bearer'=>'admin']);
+            ->where(function($query) {
+                $query->whereNotIn('coupon_code', ['0', 'NULL'])
+                    ->orWhere(function($query) {
+                        $query->where([
+                            'extra_discount_type'=>'free_shipping_over_order_amount',
+                            'free_delivery_bearer'=>'seller'
+                        ]);
+                    });
             })
             ->whereHas('orderTransaction', function ($query){
                 $query->where(['status'=>'disburse']);

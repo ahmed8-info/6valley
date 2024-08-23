@@ -2,13 +2,18 @@
 
 namespace App\Http\Controllers\Vendor;
 
+use App\Contracts\Repositories\CustomerRepositoryInterface;
+use App\Contracts\Repositories\VendorRepositoryInterface;
+use App\Enums\ExportFileNames\Admin\Report;
+use App\Exports\ExpenseTransactionReportExport;
+use App\Exports\OrderTransactionReportExport;
 use App\Http\Controllers\Controller;
 use App\Models\BusinessSetting;
 use App\Models\Order;
 use App\Models\OrderTransaction;
 use App\Models\Product;
 use App\Models\Shop;
-use App\User;
+use App\Models\User;
 use App\Utils\BackEndHelper;
 use App\Utils\Helpers;
 use Carbon\Carbon;
@@ -16,10 +21,18 @@ use Carbon\CarbonPeriod;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\View;
+use Maatwebsite\Excel\Facades\Excel;
 use Rap2hpoutre\FastExcel\FastExcel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class TransactionReportController extends Controller
 {
+    public function __construct(
+        private readonly VendorRepositoryInterface $vendorRepo,
+        private readonly CustomerRepositoryInterface $customerRepo,
+    )
+    {
+    }
     public function order_transaction_list(Request $request)
     {
         $search = $request['search'];
@@ -90,88 +103,65 @@ class TransactionReportController extends Controller
         return view('vendor-views.transaction.order-list', compact('customers','transactions','product_data','search',
             'order_transaction_chart', 'payment_data','status', 'date_type', 'from', 'to', 'customer_id'));
     }
+    public function orderTransactionExportExcel(Request $request):BinaryFileResponse
+    {
+        $search = $request['search'];
+        $from = $request['from'];
+        $to = $request['to'];
+        $dateType = $request['date_type'] ?? 'this_year';
+        $vendorId = auth('seller')->id();
+        $vendor = $this->vendorRepo->getFirstWhere(params:['id' => $vendorId]);
+        $customer = isset($request['customer_id']) && $request['customer_id'] !='all' ? $this->customerRepo->getFirstWhere(params:['id' => $request['customer_id']]):'all';
 
-    public function order_transaction_export_excel(Request $request){
         $transactions = self::order_transaction_table_data_filter($request)->latest('updated_at')->get();
+        $transactions->map(function ($transaction) {
+            $transaction['adminCouponDiscount'] = ($transaction->order->coupon_discount_bearer == 'inhouse' && $transaction->order->discount_type == 'coupon_discount') ? $transaction->order->discount_amount : 0;
+            $transaction['adminShippingDiscount'] = ($transaction->order->free_delivery_bearer == 'admin' && $transaction->order->is_shipping_free) ? $transaction->order->extra_discount : 0;
+            $transaction['vendorCouponDiscount'] = ($transaction->order->coupon_discount_bearer == 'seller' && $transaction->order->discount_type == 'coupon_discount') ? $transaction->order->discount_amount : 0;
+            $transaction['vendorShippingDiscount'] = ($transaction->order->free_delivery_bearer=='seller' && $transaction->order->is_shipping_free) ? $transaction->order->extra_discount : 0;
 
-        $tranData = array();
-        foreach ($transactions as $tran) {
-            if($tran['order']) {
-                $shop_name = Shop::where('seller_id', auth('seller')->id())->first()->name;
-
-                if(!$tran->order->is_guest && isset($tran->customer)){
-                    $customer_name =$tran->customer->f_name . ' ' . $tran->customer->l_name;
-                }elseif($tran->order->is_guest){
-                    $customer_name = translate('guest_customer');
-                }else{
-                    $customer_name = translate('not_found');
-                }
-
-                $admin_coupon_discount = ($tran->order->coupon_discount_bearer == 'inhouse' && $tran->order->discount_type == 'coupon_discount') ? $tran->order->discount_amount : 0;
-                $admin_shipping_discount = ($tran->order->is_shipping_free && $tran->order->free_delivery_bearer=='admin') ? $tran->order->extra_discount : 0;
-
-                $seller_coupon_discount = ($tran->order->coupon_discount_bearer == 'seller' && $tran->order->discount_type == 'coupon_discount') ? $tran->order->discount_amount : 0;
-                $seller_shipping_discount = ($tran->order->is_shipping_free && $tran->order->free_delivery_bearer=='seller') ? $tran->order->extra_discount : 0;
-
-                // seller net income calculation
-                $seller_net_income = 0;
-                if(isset($tran->order->deliveryMan) && $tran->order->deliveryMan->seller_id != '0'){
-                    $seller_net_income += $tran['delivery_charge'];
-                }
-
-                if($tran['seller_is'] == 'seller'){
-                    $seller_net_income += $tran['order_amount'] + $tran['tax'] - $tran['admin_commission'];
-                }
-
-                if($tran->order->shipping_responsibility == 'sellerwise_shipping' && $tran->order->delivery_type == 'self_delivery' && $tran->order->seller_is == 'seller'){
-                    $seller_net_income -= $tran->order->deliveryman_charge;
-                }
-
-                $final_seller_shipping_discount = $seller_shipping_discount;
-                if($tran['seller_is'] == 'seller'){
-                    if($tran->order->shipping_responsibility == 'inhouse_shipping'){
-                        $seller_net_income += $tran->order->coupon_discount_bearer == 'inhouse' ? $admin_coupon_discount : 0;
-                        $seller_net_income -= ($tran->order->coupon_discount_bearer == 'seller' && $tran->order->coupon->coupon_type == 'free_delivery') ? $admin_coupon_discount:0;
-                        $seller_net_income -= ($tran->order->free_delivery_bearer == 'seller') ? $admin_shipping_discount:0;
-
-                    }elseif($tran->order->shipping_responsibility == 'sellerwise_shipping'){
-                        $seller_net_income += $tran->order->coupon_discount_bearer == 'inhouse' ? $admin_coupon_discount : 0;
-                        $seller_net_income += $tran->order->free_delivery_bearer == 'admin' ? $admin_shipping_discount : 0;
-                        $final_seller_shipping_discount = 0;
-                    }
-                }
-
-                $tranData[] = array(
-                    'Order ID' => $tran->order_id,
-                    'Shop Name' => $shop_name,
-                    'Customer Name' => $customer_name,
-                    'Total Product Amount' => BackEndHelper::set_symbol(BackEndHelper::usd_to_currency($tran->orderDetails[0]->order_details_sum_price)),
-                    'Product Discount' => BackEndHelper::set_symbol(BackEndHelper::usd_to_currency($tran->orderDetails[0]->order_details_sum_discount)),
-                    'Coupon Discount' => BackEndHelper::set_symbol(BackEndHelper::usd_to_currency($tran->order->discount_amount)),
-                    'Discounted Amount' => BackEndHelper::set_symbol(BackEndHelper::usd_to_currency($tran->orderDetails[0]->order_details_sum_price - $tran->orderDetails[0]->order_details_sum_discount - (isset($tran->order->coupon) && $tran->order->coupon->coupon_type == 'free_delivery'?0:$tran->order->discount_amount))),
-                    'Tax' => BackEndHelper::set_symbol(BackEndHelper::usd_to_currency($tran->tax)),
-                    'Delivery Charge' => BackEndHelper::set_symbol(BackEndHelper::usd_to_currency($tran->order->shipping_cost)),
-                    'Deliveryman Incentive' => BackEndHelper::set_symbol(BackEndHelper::usd_to_currency(($tran->order->shipping_responsibility == 'sellerwise_shipping' && $tran->order->delivery_type=='self_delivery' && $tran->order->delivery_man_id) ? $tran->order->deliveryman_charge : 0)),
-                    'Order Amount' => BackEndHelper::set_symbol(BackEndHelper::usd_to_currency($tran->order->order_amount)),
-                    'Delivered By' => $tran->delivered_by,
-                    'Admin Discount' => BackEndHelper::set_symbol(BackEndHelper::usd_to_currency($admin_coupon_discount+$admin_shipping_discount)),
-                    'Vendor Discount' => BackEndHelper::set_symbol(BackEndHelper::usd_to_currency($seller_coupon_discount+$seller_shipping_discount)),
-                    'Admin Commission' => BackEndHelper::set_symbol(BackEndHelper::usd_to_currency($tran->admin_commission)),
-                    'Vendor Net Income' => BackEndHelper::set_symbol(BackEndHelper::usd_to_currency($seller_net_income - $final_seller_shipping_discount)),
-                    'Payment Method' => $tran->payment_method,
-                    'Status' => $tran->status,
-                );
+            $vendorNetIncome = 0;
+            if (isset($transaction->order->deliveryMan) && $transaction->order->deliveryMan->seller_id != '0') {
+                $vendorNetIncome += $transaction['delivery_charge'];
             }
-        }
+            if ($transaction['seller_is'] == 'seller') {
+                $vendorNetIncome += $transaction['order_amount'] + $transaction['tax'] - $transaction['admin_commission'];
+            }
+            if($transaction->order->delivery_type == 'self_delivery' && $transaction->order->shipping_responsibility == 'sellerwise_shipping' && $transaction->order->seller_is == 'seller'){
+                $vendorNetIncome -= $transaction->order->deliveryman_charge;
+            }
+            if ($transaction['seller_is'] == 'seller') {
+                if ($transaction->order->shipping_responsibility == 'inhouse_shipping') {
+                    $vendorNetIncome += $transaction->order->coupon_discount_bearer == 'inhouse' ? $transaction['adminCouponDiscount'] : 0;
+                    $vendorNetIncome -= ($transaction->order->coupon_discount_bearer == 'seller' && isset($transaction->order->coupon) && $transaction->order->coupon->coupon_type == 'free_delivery') ? $transaction['adminCouponDiscount'] : 0;
+                    $vendorNetIncome -= ($transaction->order->free_delivery_bearer == 'seller') ? $transaction['adminShippingDiscount'] : 0;
 
-        return (new FastExcel($tranData))->download('Order_Transaction_details.xlsx');
+                } elseif ($transaction->order->shipping_responsibility == 'sellerwise_shipping') {
+                    $vendorNetIncome += $transaction->order->coupon_discount_bearer == 'inhouse' ? $transaction['adminCouponDiscount'] : 0;
+                    $vendorNetIncome += $transaction->order->free_delivery_bearer == 'admin' ? $transaction['adminShippingDiscount'] : 0;
+                    $transaction['vendorShippingDiscount'] = 0;
+                }
+            }
+            $transaction['vendorNetIncome'] = $vendorNetIncome;
+        });
+        $data = [
+            'data-from' => 'vendor',
+            'search' => $search,
+            'from' => $from,
+            'to' => $to,
+            'dateType' => $dateType,
+            'vendor' => $vendor,
+            'customer' => $customer,
+            'transactions' => $transactions,
+        ];
+        return Excel::download(new OrderTransactionReportExport($data), Report::ORDER_TRANSACTION_REPORT_LIST);
     }
 
     public function order_transaction_summary_pdf(Request $request){
         $company_phone = BusinessSetting::where('type', 'company_phone')->first()->value;
         $company_email = BusinessSetting::where('type', 'company_email')->first()->value;
         $company_name = BusinessSetting::where('type', 'company_name')->first()->value;
-        $company_web_logo = BusinessSetting::where('type', 'company_web_logo')->first()->value;
+        $company_web_logo = getWebConfig('company_web_logo');
 
         $from = $request['from'];
         $to = $request['to'];
@@ -310,7 +300,7 @@ class TransactionReportController extends Controller
         $company_phone = BusinessSetting::where('type', 'company_phone')->first()->value;
         $company_email = BusinessSetting::where('type', 'company_email')->first()->value;
         $company_name = BusinessSetting::where('type', 'company_name')->first()->value;
-        $company_web_logo = BusinessSetting::where('type', 'company_web_logo')->first()->value;
+        $company_web_logo = getWebConfig('company_web_logo');
 
         $transaction = OrderTransaction::with(['seller.shop', 'customer', 'order', 'orderDetails'])
             ->withSum('orderDetails', 'price')
@@ -623,9 +613,14 @@ class TransactionReportController extends Controller
                 'seller_is'=>'seller',
                 'seller_id'=>auth('seller')->id()
             ])
-            ->whereNotIn('coupon_code', ['0', 'NULL'])
-            ->orWhere(function($query){
-                $query->where(['extra_discount_type'=>'free_shipping_over_order_amount', 'free_delivery_bearer'=>'seller']);
+            ->where(function($query) {
+                $query->whereNotIn('coupon_code', ['0', 'NULL'])
+                    ->orWhere(function($query) {
+                        $query->where([
+                            'extra_discount_type'=>'free_shipping_over_order_amount',
+                            'free_delivery_bearer'=>'seller'
+                        ]);
+                    });
             })
             ->whereHas('orderTransaction', function ($query) use($search){
                 $query->where(['status'=>'disburse']);
@@ -658,17 +653,23 @@ class TransactionReportController extends Controller
                 'seller_is'=>'seller',
                 'seller_id'=>auth('seller')->id()
             ])
-            ->whereNotIn('coupon_code', ['0', 'NULL'])
-            ->orWhere(function($query){
-                $query->where(['extra_discount_type'=>'free_shipping_over_order_amount', 'free_delivery_bearer'=>'seller']);
+            ->where(function($query) {
+                $query->whereNotIn('coupon_code', ['0', 'NULL'])
+                    ->orWhere(function($query) {
+                        $query->where([
+                            'extra_discount_type'=>'free_shipping_over_order_amount',
+                            'free_delivery_bearer'=>'seller'
+                        ]);
+                    });
             })
-            ->whereHas('orderTransaction', function ($query) use($search){
-                $query->where(['status'=>'disburse'])
+            ->whereHas('orderTransaction', function ($query) use($search) {
+                return $query->where(['status'=>'disburse'])
                     ->when($search, function ($q) use ($search) {
-                        $q->Where('order_id', 'like', "%{$search}%")
+                        $q->where('order_id', 'like', "%{$search}%")
                             ->orWhere('transaction_id', 'like', "%{$search}%");
                     });
             });
+
         $expense_transactions_table = self::date_wise_common_filter($expense_transaction_query, $date_type, $from, $to);
         $expense_transactions_table = $expense_transactions_table->latest('updated_at')->paginate(Helpers::pagination_limit())->appends($query_param);
         return view('vendor-views.transaction.expense-list', compact('expense_transactions_table', 'expense_transaction_chart',
@@ -860,9 +861,14 @@ class TransactionReportController extends Controller
                 'seller_id'=>auth('seller')->id(),
                 'order_status'=>'delivered'
             ])
-            ->whereNotIn('coupon_code', ['0', 'NULL'])
-            ->orWhere(function($query){
-                $query->where(['extra_discount_type'=>'free_shipping_over_order_amount', 'free_delivery_bearer'=>'seller']);
+            ->where(function($query) {
+                $query->whereNotIn('coupon_code', ['0', 'NULL'])
+                    ->orWhere(function($query) {
+                        $query->where([
+                            'extra_discount_type'=>'free_shipping_over_order_amount',
+                            'free_delivery_bearer'=>'seller'
+                        ]);
+                    });
             })
             ->whereHas('orderTransaction', function ($query){
                 $query->where(['status'=>'disburse']);
@@ -897,7 +903,7 @@ class TransactionReportController extends Controller
         $company_phone = BusinessSetting::where('type', 'company_phone')->first()->value;
         $company_email = BusinessSetting::where('type', 'company_email')->first()->value;
         $company_name = BusinessSetting::where('type', 'company_name')->first()->value;
-        $company_web_logo = BusinessSetting::where('type', 'company_web_logo')->first()->value;
+        $company_web_logo = getWebConfig('company_web_logo');
 
         $transaction = Order::with(['orderTransaction', 'coupon'])
             ->where(['id'=> $request->id, 'seller_is'=>'seller', 'seller_id'=>auth('seller')->id()])
@@ -913,7 +919,7 @@ class TransactionReportController extends Controller
         $company_phone = BusinessSetting::where('type', 'company_phone')->first()->value;
         $company_email = BusinessSetting::where('type', 'company_email')->first()->value;
         $company_name = BusinessSetting::where('type', 'company_name')->first()->value;
-        $company_web_logo = BusinessSetting::where('type', 'company_web_logo')->first()->value;
+        $company_web_logo = getWebConfig('company_web_logo');
         $shop_name = Shop::where(['seller_id'=>auth('seller')->id()])->first()->name;
 
         $search = $request['search'];
@@ -930,9 +936,14 @@ class TransactionReportController extends Controller
                 'seller_is'=>'seller',
                 'seller_id'=>auth('seller')->id()
             ])
-            ->whereNotIn('coupon_code', ['0', 'NULL'])
-            ->orWhere(function($query){
-                $query->where(['extra_discount_type'=>'free_shipping_over_order_amount', 'free_delivery_bearer'=>'seller']);
+            ->where(function($query) {
+                $query->whereNotIn('coupon_code', ['0', 'NULL'])
+                    ->orWhere(function($query) {
+                        $query->where([
+                            'extra_discount_type'=>'free_shipping_over_order_amount',
+                            'free_delivery_bearer'=>'seller'
+                        ]);
+                    });
             })
             ->whereHas('orderTransaction', function ($query) use($search){
                 $query->where(['status'=>'disburse'])
@@ -977,23 +988,30 @@ class TransactionReportController extends Controller
 
     }
 
-    public function expense_transaction_export_excel(Request $request)
+    public function expenseTransactionExportExcel(Request $request):BinaryFileResponse
     {
         $search = $request['search'];
         $from = $request['from'];
         $to = $request['to'];
-        $date_type = $request['date_type'] ?? 'this_year';
+        $dateType = $request['date_type'] ?? 'this_year';
+        $vendorId = auth('seller')->id();
+        $vendor = $this->vendorRepo->getFirstWhere(params:['id' => $vendorId]);
         $expense_transaction_query = Order::with(['orderTransaction', 'coupon'])
             ->where([
-                'order_type'=> 'default_type',
                 'coupon_discount_bearer'=> 'seller',
                 'order_status'=>'delivered',
+                'order_type'=> 'default_type',
                 'seller_is'=>'seller',
-                'seller_id'=>auth('seller')->id()
+                'seller_id'=>$vendorId
             ])
-            ->whereNotIn('coupon_code', ['0', 'NULL'])
-            ->orWhere(function($query){
-                $query->where(['extra_discount_type'=>'free_shipping_over_order_amount', 'free_delivery_bearer'=>'seller']);
+            ->where(function($query) {
+                $query->whereNotIn('coupon_code', ['0', 'NULL'])
+                    ->orWhere(function($query) {
+                        $query->where([
+                            'extra_discount_type'=>'free_shipping_over_order_amount',
+                            'free_delivery_bearer'=>'seller'
+                        ]);
+                    });
             })
             ->whereHas('orderTransaction', function ($query) use($search){
                 $query->where(['status'=>'disburse'])
@@ -1002,23 +1020,16 @@ class TransactionReportController extends Controller
                             ->orWhere('transaction_id', 'like', "%{$search}%");
                     });
             });
-        $transactions = self::date_wise_common_filter($expense_transaction_query, $date_type, $from, $to)->latest('updated_at')->get();
-
-        $tranData = array();
-        foreach ($transactions as $transaction) {
-            $expense_type =$transaction->coupon_discount_bearer == 'seller'?(isset($transaction->coupon->coupon_type) ? ($transaction->coupon->coupon_type == 'free_delivery' ? 'Free Delivery Coupon':ucwords(str_replace('_', ' ', $transaction->coupon->coupon_type))) : ''):'';
-            $expense_type .= ', ';
-            $expense_type .= $transaction->free_delivery_bearer == 'seller'?ucwords(str_replace('_', ' ', $transaction->extra_discount_type)):'';
-
-            $tranData[] = array(
-                'XID' => $transaction->orderTransaction->transaction_id,
-                'Transaction Date' => date_format($transaction->orderTransaction->updated_at, 'd F Y'),
-                'Order ID' => $transaction->id,
-                'Expense Amount' => BackEndHelper::set_symbol(BackEndHelper::usd_to_currency(($transaction->coupon_discount_bearer == 'seller'?$transaction->discount_amount:0) + ($transaction->free_delivery_bearer=='seller'?$transaction->extra_discount:0))),
-                'Expense Type' => $expense_type,
-            );
-        }
-
-        return (new FastExcel($tranData))->download('expense_transaction.xlsx');
+        $transactions = self::date_wise_common_filter($expense_transaction_query, $dateType, $from, $to)->latest('updated_at')->get();
+        $data = [
+            'data-from' => 'vendor',
+            'vendor' => $vendor,
+            'search' => $search,
+            'from' => $from,
+            'to' => $to,
+            'dateType' => $dateType,
+            'transactions' => $transactions,
+        ];
+        return Excel::download(new ExpenseTransactionReportExport($data), Report::EXPENSE_TRANSACTION_REPORT_LIST);
     }
 }

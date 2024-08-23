@@ -4,8 +4,12 @@ namespace App\Http\Controllers\Vendor\DeliveryMan;
 
 use App\Contracts\Repositories\DeliveryManRepositoryInterface;
 use App\Contracts\Repositories\ReviewRepositoryInterface;
+use App\Contracts\Repositories\VendorRepositoryInterface;
+use App\Enums\ExportFileNames\Admin\DeliveryMan as DeliveryManExport;
 use App\Enums\ViewPaths\Vendor\Dashboard;
 use App\Enums\ViewPaths\Vendor\DeliveryMan;
+use App\Enums\WebConfigKey;
+use App\Exports\DeliveryManListExport;
 use App\Http\Controllers\BaseController;
 use App\Http\Requests\Vendor\DeliveryManRequest;
 use App\Http\Requests\Vendor\DeliveryManUpdateRequest;
@@ -17,6 +21,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class DeliveryManController extends BaseController
 {
@@ -29,6 +35,7 @@ class DeliveryManController extends BaseController
         private readonly DeliveryManRepositoryInterface $deliveryManRepo,
         private readonly ReviewRepositoryInterface      $reviewRepo,
         private readonly DeliveryManService             $deliveryManService,
+        private readonly VendorRepositoryInterface      $vendorRepo,
     )
     {
     }
@@ -207,5 +214,29 @@ class DeliveryManController extends BaseController
             'five'
         ));
 
+    }
+
+    public function exportList(Request $request): BinaryFileResponse
+    {
+        $vendorId = auth('seller')->id();
+        $vendor = $this->vendorRepo->getFirstWhere(params:['id' => $vendorId]);
+        $searchValue = $request['search'];
+        $deliveryMens = $this->deliveryManRepo->getListWhere(
+            orderBy: ['id'=>'desc'],
+            searchValue: $searchValue,
+            filters: ['seller_id' => $vendorId],
+            dataLimit: getWebConfig(name: 'pagination_limit')
+        );
+        $active = $deliveryMens->where('is_active',1)->count();
+        $inactive = $deliveryMens->where('is_active',0)->count();
+        return Excel::download(new DeliveryManListExport([
+            'data-from' => 'vendor',
+            'vendor' => $vendor,
+            'delivery_men' => $deliveryMens,
+            'search' => $request['search'],
+            'active' => $active,
+            'inactive' => $inactive,
+        ]), DeliveryManExport::EXPORT_XLSX
+        );
     }
 }

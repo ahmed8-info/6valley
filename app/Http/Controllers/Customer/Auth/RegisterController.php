@@ -8,7 +8,8 @@ use App\Http\Requests\Web\CustomerRegistrationRequest;
 use App\Models\BusinessSetting;
 use App\Models\PhoneOrEmailVerification;
 use App\Models\Wishlist;
-use App\User;
+use App\Traits\EmailTemplateTrait;
+use App\Models\User;
 use App\Utils\CartManager;
 use App\Utils\Helpers;
 use App\Utils\SMS_module;
@@ -18,12 +19,12 @@ use Carbon\CarbonInterval;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Validator;
 use Modules\Gateways\Traits\SmsGateway;
 
 class RegisterController extends Controller
 {
+    use EmailTemplateTrait;
     private $user;
     public function __construct(User $user)
     {
@@ -60,18 +61,18 @@ class RegisterController extends Controller
 
         if ($request->ajax()) {
             if ($phoneVerification && !$user->is_phone_verified) {
-                self::getCustomerVerificationCheck($user->id);
+                $this->getCustomerVerificationCheck($user->id);
                 return response()->json([
                     'redirect_url' => route('customer.auth.check', [$user->id]),
                 ]);
             }
             if ($emailVerification && !$user->is_email_verified) {
-                self::getCustomerVerificationCheck($user->id);
+                $this->getCustomerVerificationCheck($user->id);
                 return response()->json([
                     'redirect_url' => route('customer.auth.check', [$user->id]),
                 ]);
             }
-            self::getCustomerVerificationCheck($user->id);
+            $this->getCustomerVerificationCheck($user->id);
             return response()->json([
                 'status' => 1,
                 'message' => translate('registration_successful'),
@@ -79,20 +80,20 @@ class RegisterController extends Controller
             ]);
         } else {
             if ($phoneVerification && !$user->is_phone_verified) {
-                self::getCustomerVerificationCheck($user->id);
+                $this->getCustomerVerificationCheck($user->id);
                 return redirect(route('customer.auth.check', [$user->id]));
             }
             if ($emailVerification && !$user->is_email_verified) {
-                self::getCustomerVerificationCheck($user->id);
+                $this->getCustomerVerificationCheck($user->id);
                 return redirect(route('customer.auth.check', [$user->id]));
             }
-            self::getCustomerVerificationCheck($user->id);
+            $this->getCustomerVerificationCheck($user->id);
             Toastr::success(translate('registration_success_login_now'));
             return redirect(route('customer.auth.login'));
         }
     }
 
-    public static function getCustomerVerificationCheck($id)
+    public function getCustomerVerificationCheck($id)
     {
         $user = User::find($id);
         $response = '';
@@ -132,7 +133,16 @@ class RegisterController extends Controller
             }
             if ($emailServicesSmtp['status'] == 1) {
                 try{
-                    EmailVerificationEvent::dispatch($user['email'], $token);
+                    $data = [
+                        'userName' => $user['f_name'],
+                        'subject' => translate('registration_Verification_Code'),
+                        'title' => translate('registration_Verification_Code'),
+                        'verificationCode' => $token,
+                        'userType'=>'customer' ,
+                        'templateName'=> 'registration-verification',
+                    ];
+
+                    event(new EmailVerificationEvent(email: $user['email'],data: $data));
                     $response = translate('check_your_email');
                 } catch (\Exception $exception) {
                     Toastr::error(translate('email_is_not_configured').'. '.translate('contact_with_the_administrator'));
@@ -334,6 +344,7 @@ class RegisterController extends Controller
                 return $q;
             })->where('customer_id', $user->id)->pluck('product_id')->toArray();
 
+            session()->forget('wish_list');
             session()->put('wish_list', $wish_list);
             $company_name = BusinessSetting::where('type', 'company_name')->first();
             $message = translate('welcome_to') .' '. $company_name->value . '!';
@@ -403,7 +414,15 @@ class RegisterController extends Controller
                 }
                 if ($email_services_smtp['status'] == 1) {
                     try{
-                        EmailVerificationEvent::dispatch($user['email'], $new_token_generate);
+                        $data = [
+                            'userName' => $user['f_name'],
+                            'subject' => translate('registration_Verification_Code'),
+                            'title' => translate('registration_Verification_Code'),
+                            'verificationCode' => $new_token_generate,
+                            'userType'=>'customer',
+                            'templateName'=> 'registration-verification',
+                        ];
+                        event(new EmailVerificationEvent(email: $user['email'],data: $data));
                     } catch (\Exception $exception) {
                         return response()->json([
                             'status'=>"0",

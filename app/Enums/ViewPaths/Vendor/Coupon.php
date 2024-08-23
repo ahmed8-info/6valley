@@ -29,5 +29,10 @@ enum Coupon
         URI => 'update-status',
         VIEW => ''
     ];
+    const EXPORT = [
+        URI => 'export',
+        VIEW => ''
+    ];
+
 
 }

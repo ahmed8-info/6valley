@@ -20,8 +20,8 @@
             </div>
         </div>
         <div class="card">
-            <div class="card-header">
-                <div class="flex-between justify-content-between align-items-center flex-grow-1">
+            <div class="p-3">
+                <div class="row justify-content-between align-items-center">
                     <div class="col-12 col-md-4">
                         <form action="{{ url()->current() }}" method="GET">
                             <div class="input-group input-group-merge input-group-custom">
@@ -32,11 +32,32 @@
                                 </div>
                                 <input id="datatableSearch_" type="search" name="search" class="form-control"
                                        placeholder="{{translate('search_by_order_id_or_refund_id')}}"
-                                       aria-label="Search orders" value="{{ $searchValue }}"
-                                       required>
+                                       aria-label="Search orders" value="{{ request('searchValue') }}">
                                 <button type="submit" class="btn btn--primary">{{translate('search')}}</button>
                             </div>
                         </form>
+                    </div>
+                    <div class="col-12 mt-3 col-md-8">
+                        <div class="d-flex gap-3 justify-content-md-end">
+                            <div class="dropdown text-nowrap">
+                                <button type="button" class="btn btn-outline--primary" data-toggle="dropdown">
+                                    <i class="tio-download-to"></i>
+                                    {{translate('export')}}
+                                    <i class="tio-chevron-down"></i>
+                                </button>
+
+                                <ul class="dropdown-menu dropdown-menu-right">
+                                    <li>
+                                        <a type="submit" class="dropdown-item d-flex align-items-center gap-2 "
+                                           href="{{route('vendor.refund.export',['status'=>request('status'),'search'=>request('search')])}}">
+                                            <img width="14" src="{{dynamicAsset(path: 'public/assets/back-end/img/excel.png')}}"
+                                                 alt="">
+                                            {{translate('excel')}}
+                                        </a>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -75,7 +96,7 @@
                                 @if ($refund->product!=null)
                                     <div class="d-flex flex-wrap gap-2">
                                         <a href="{{route('vendor.products.view',[$refund->product->id])}}">
-                                            <img src="{{getValidImage(path:'storage/app/public/product/thumbnail/'.$refund->product->thumbnail ,type:'backend-product')}}"
+                                            <img src="{{getStorageImages(path: $refund?->product?->thumbnail_full_url ,type:'backend-product')}}"
                                                  class="avatar border" alt="">
                                         </a>
                                         <div class="d-flex flex-column gap-1">

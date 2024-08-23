@@ -134,24 +134,25 @@ $('#software-update-form').on('submit', function (e) {
     });
 });
 
-function initAutocomplete() {
+async function initAutocomplete() {
     let latitude = $("#get-default-latitude").data('latitude');
     let longitude = $("#get-default-longitude").data('longitude');
     let myLatLng = {
         lat: latitude,
         lng: longitude
     };
-
+    const { Map } = await google.maps.importLibrary("maps");
+    const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
     const map = new google.maps.Map(document.getElementById("location-map-canvas"), {
         center: {
             lat: latitude,
             lng: longitude
         },
         zoom: 13,
-        mapTypeId: "roadmap",
+        mapId: "roadmap",
     });
 
-    var marker = new google.maps.Marker({
+    var marker = new AdvancedMarkerElement({
         position: myLatLng,
         map: map,
     });
@@ -162,7 +163,7 @@ function initAutocomplete() {
         var coordinates = JSON.stringify(mapsMouseEvent.latLng.toJSON(), null, 2);
         var coordinates = JSON.parse(coordinates);
         var latlng = new google.maps.LatLng(coordinates['lat'], coordinates['lng']);
-        marker.setPosition(latlng);
+        marker.position={lat:coordinates['lat'], lng:coordinates['lng']};
         map.panTo(latlng);
 
         document.getElementById('latitude').value = coordinates['lat'];
@@ -201,7 +202,7 @@ function initAutocomplete() {
                 console.log("Returned place contains no geometry");
                 return;
             }
-            var mrkr = new google.maps.Marker({
+            var mrkr = new AdvancedMarkerElement({
                 map,
                 title: place.name,
                 position: place.geometry.location,

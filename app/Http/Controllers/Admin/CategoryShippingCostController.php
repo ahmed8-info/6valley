@@ -33,7 +33,7 @@ class CategoryShippingCostController extends BaseController
         if (isset($request->ids)) {
             foreach ($request->ids as $key => $id) {
                 $this->categoryShippingCostRepo->updateOrInsert( params:['seller_id' => 0, 'category_id' => $request['category_ids'][$key]], data: [
-                    'cost' => usdToDefaultCurrency(amount: $request['cost'][$key]),
+                    'cost' => currencyConverter(amount: $request['cost'][$key]),
                     'multiply_qty' => isset($request->multiplyQTY) ? (in_array($id, $request->multiplyQTY) ? 1 : 0) : 0,
                     'updated_at' => now()
                 ]);

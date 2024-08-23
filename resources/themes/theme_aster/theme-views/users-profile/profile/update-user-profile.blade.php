@@ -69,7 +69,7 @@
                                                 <label>{{translate('attachment')}}</label>
                                                 <div class="d-flex flex-column gap-3">
                                                     <div class="upload-file">
-                                                        <input type="file" class="upload-file__input"  name="image" multiple aria-required="true" accept="image/*">
+                                                        <input type="file" class="upload-file__input --size-8-75rem"  name="image" multiple aria-required="true" accept="image/*">
                                                         <div class="upload-file__img">
                                                             <div class="temp-img-box">
                                                                 <div class="d-flex align-items-center flex-column gap-2">
@@ -87,7 +87,7 @@
                                         </div>
                                         <div class="col-12">
                                             <div class="d-flex justify-content-end gap-3">
-                                                <button type="reset" class="btn btn-secondary">{{translate('reset')}}</button>
+                                                <button type="reset" class="btn btn-secondary" id="profile-reset-button">{{translate('reset')}}</button>
                                                 <button type="submit" class="btn btn-primary text-capitalize">{{translate('update_profile')}}</button>
                                             </div>
                                         </div>

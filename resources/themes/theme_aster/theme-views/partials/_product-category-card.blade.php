@@ -5,7 +5,7 @@
 <div class="swiper-slide">
     <a href="javascript:"
        class="store-product d-flex flex-column gap-2 align-items-center ov-hidden">
-        <div class="store-product__top border rounded mb-2">
+        <div class="store-product__top border rounded mb-2 aspect-1 overflow-hidden">
             @if(isset($product->flash_deal_status) && $product->flash_deal_status == 1)
                 <div class="product__power-badge">
                     <img src="{{theme_asset('assets/img/svg/power.svg')}}" alt="" class="svg text-white">
@@ -28,8 +28,8 @@
                   data-product-id="{{$product['id']}}">
                 <i class="bi bi-eye fs-12"></i>
             </span>
-            <img width="155" alt="" loading="lazy" class="dark-support rounded"
-                 src="{{ getValidImage(path: 'storage/app/public/product/thumbnail/'.$product['thumbnail'], type: 'product') }}">
+            <img alt="" loading="lazy" class="dark-support rounded aspect-1 img-fit"
+                 src="{{ getStorageImages(path: $product?->thumbnail_full_url, type: 'product') }}">
         </div>
         <a class="fs-16 text-truncate text-muted text-capitalize width--9rem"  href="{{route('product',$product->slug)}}">
             {{ Str::limit($product['name'], 18) }}

@@ -3,11 +3,11 @@
 namespace App\Listeners;
 
 use App\Events\CustomerStatusUpdateEvent;
-use App\Mail\CustomerStatusUpdateMail;
-use Illuminate\Support\Facades\Mail;
+use App\Traits\EmailTemplateTrait;
 
 class CustomerStatusUpdateListener
 {
+    use EmailTemplateTrait;
     public function __construct()
     {
         //
@@ -15,16 +15,12 @@ class CustomerStatusUpdateListener
 
     public function handle(CustomerStatusUpdateEvent $event): void
     {
-        $this->sendNotification($event);
+        $this->sendMail($event);
     }
 
-    public function sendNotification($event): void
-    {
+    private function sendMail(CustomerStatusUpdateEvent $event):void{
+        $email = $event->email;
         $data = $event->data;
-        try{
-            Mail::to($data['email'])->send(new CustomerStatusUpdateMail($data));
-        }catch(\Exception $exception) {
-            info($exception);
-        }
+        $this->sendingMail(sendMailTo: $email,userType: $data['userType'],templateName: $data['templateName'],data: $data);
     }
 }

@@ -47,7 +47,7 @@
                                 <input type="hidden" name="reset_token" value="{{$token}}" required>
                                 <div class="d-flex justify-content-center gap-3 mt-5">
                                     <button class="btn btn-primary px-sm-5"
-                                            type="submit">{{ translate('verify') }}</button>
+                                            type="submit">{{ translate('submit') }}</button>
                                 </div>
                             </form>
                         </div>

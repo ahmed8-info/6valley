@@ -203,7 +203,7 @@
                             <button type="submit" class="btn btn--primary">{{ translate('search')}}</button>
                         </div>
                     </form>
-                    <div>
+                    <div class="dropdown">
                         <button type="button" class="btn btn-outline--primary text-nowrap btn-block"
                                 data-toggle="dropdown">
                             <i class="tio-download-to"></i>
@@ -255,13 +255,13 @@
                                 <a class="title-color"
                                    href="{{route('admin.orders.details',['id'=>$order->id])}}">{{$order->id}}</a>
                             </td>
-                            <td>{{ setCurrencySymbol(amount: usdToDefaultCurrency(amount: $order->order_amount), currencyCode: getCurrencyCode()) }}</td>
-                            <td>{{ setCurrencySymbol(amount: usdToDefaultCurrency(amount: $order->details_sum_discount), currencyCode: getCurrencyCode()) }}</td>
-                            <td>{{ setCurrencySymbol(amount: usdToDefaultCurrency(amount: $order->discount_amount), currencyCode: getCurrencyCode()) }}</td>
+                            <td>{{ setCurrencySymbol(amount: usdToDefaultCurrency(amount: $order?->order_amount??0), currencyCode: getCurrencyCode()) }}</td>
+                            <td>{{ setCurrencySymbol(amount: usdToDefaultCurrency(amount: $order?->details_sum_discount??0), currencyCode: getCurrencyCode()) }}</td>
+                            <td>{{ setCurrencySymbol(amount: usdToDefaultCurrency(amount: $order?->discount_amount??0), currencyCode: getCurrencyCode()) }}</td>
                             <td>{{ setCurrencySymbol(amount: usdToDefaultCurrency(amount: $order->shipping_cost - ($order->extra_discount_type == 'free_shipping_over_order_amount' ? $order->extra_discount : 0)), currencyCode: getCurrencyCode()) }}</td>
-                            <td>{{ setCurrencySymbol(amount: usdToDefaultCurrency(amount: $order->details_sum_tax), currencyCode: getCurrencyCode()) }}</td>
-                            <td>{{ setCurrencySymbol(amount: usdToDefaultCurrency(amount: $order->admin_commission), currencyCode: getCurrencyCode()) }}</td>
-                            <td>{{ setCurrencySymbol(amount: usdToDefaultCurrency(amount: $order->deliveryman_charge), currencyCode: getCurrencyCode()) }}</td>
+                            <td>{{ setCurrencySymbol(amount: usdToDefaultCurrency(amount: $order?->details_sum_tax??0), currencyCode: getCurrencyCode()) }}</td>
+                            <td>{{ setCurrencySymbol(amount: usdToDefaultCurrency(amount: $order?->admin_commission??0), currencyCode: getCurrencyCode()) }}</td>
+                            <td>{{ setCurrencySymbol(amount: usdToDefaultCurrency(amount: $order?->deliveryman_charge??0), currencyCode: getCurrencyCode()) }}</td>
                             <td>
                                 <div class="d-flex justify-content-center">
                                     @if($order['order_status']=='pending')

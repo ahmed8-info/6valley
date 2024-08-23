@@ -63,7 +63,15 @@ class CustomerWalletController extends BaseController
         $customerWalletService->sendPushNotificationMessage(request: $request, customer: $customer);
 
         if ($walletTransaction) {
-            event(new AddFundToWalletEvent(email: $customer['email'], walletTransaction: $walletTransaction));
+            $data = [
+                'walletTransaction' => $walletTransaction,
+                'userName' => $customer['f_name'],
+                'userType' => 'customer',
+                'templateName' => 'add-fund-to-wallet',
+                'subject' => translate('add_fund_to_wallet'),
+                'title' => translate('add_fund_to_wallet'),
+            ];
+            event(new AddFundToWalletEvent(email: $customer['email'], data: $data));
             return response()->json(['message' => translate('transaction_successful')], 200);
         }
 

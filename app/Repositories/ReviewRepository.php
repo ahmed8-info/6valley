@@ -91,6 +91,9 @@ class ReviewRepository implements ReviewRepositoryInterface
                 })->when(!empty($whereInFilters['customer_id']) && $whereInFilters['customer_id'] != 0, function ($query) use ($whereInFilters) {
                     $query->whereIn('customer_id', $whereInFilters['customer_id']);
                 })
+                ->when((isset($whereInFilters['product_id'])&& empty($whereInFilters['product_id']))&& (isset($whereInFilters['customer_id']) && empty($whereInFilters['customer_id'])), function ($query) use ($whereInFilters) {
+                    $query->where('id', null);
+                })
                 ->when(isset($filters['from']) && isset($filters['to']), function ($query) use ($filters) {
                     $query->whereBetween('created_at', [$filters['from'] . ' 00:00:00', $filters['to'] . ' 23:59:59']);
                 })

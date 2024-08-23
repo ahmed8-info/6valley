@@ -7,7 +7,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <title>@yield('title')</title>
     <meta name="_token" content="{{ csrf_token() }}">
-    <link rel="shortcut icon" href="{{dynamicStorage(path: 'storage/app/public/company/'.getWebConfig(name: 'company_fav_icon'))}}">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <link rel="shortcut icon" href="{{getStorageImages(path: getWebConfig(name: 'company_fav_icon'), type:'backend-logo')}}">
 
     <link rel="stylesheet" href="{{dynamicAsset(path: 'public/assets/back-end/css/bootstrap.min.css')}}">
     <link rel="stylesheet" href="{{ dynamicAsset(path: 'public/assets/back-end/css/vendor.min.css') }}">
@@ -52,25 +53,13 @@
         @include('layouts.back-end.partials-seller._toggle-modal')
         @include('layouts.back-end._translator-for-js')
         @include('layouts.back-end.partials-seller._sign-out-modal')
-
+        @include('layouts.back-end._alert-message')
     </main>
 
     <audio id="myAudio">
         <source src="{{ dynamicAsset(path: 'public/assets/back-end/sound/notification.mp3') }}" type="audio/mpeg">
     </audio>
 
-    <div class="alert alert--message-2 alert-dismissible fade show" role="alert" id="chatting-new-notification-check">
-        <img width="28" src="{{ dynamicAsset(path: 'public/assets/back-end/img/icons/chatting-notification.svg') }}" alt="">
-        <div class="w-0">
-            <h6>{{ translate('Message') }}</h6>
-            <span id="chatting-new-notification-check-message">
-            {{ translate('New_Message') }}
-        </span>
-        </div>
-        <button type="button" class="close position-relative p-0" data-dismiss="alert" aria-label="Close">
-            <span aria-hidden="true">&times;</span>
-        </button>
-    </div>
 
     <span class="please_fill_out_this_field" data-text="{{ translate('please_fill_out_this_field') }}"></span>
     <span id="onerror-chatting" data-onerror-chatting="{{dynamicAsset(path: 'public/assets/back-end/img/image-place-holder.png')}}"></span>
@@ -91,6 +80,19 @@
     <span id="message-you-will-not-be-able-to-revert-this"
           data-text="{{ translate('you_will_not_be_able_to_revert_this') }}"></span>
     <span id="getChattingNewNotificationCheckRoute" data-route="{{ route('vendor.messages.new-notification') }}"></span>
+
+    <span id="get-stock-limit-status" data-action="{{route('vendor.products.stock-limit-status')}}"></span>
+    <span id="get-product-stock-limit-title" data-title="{{translate('warning')}}"></span>
+    <span id="get-product-stock-limit-image" data-warning-image="{{ dynamicAsset(path: 'public/assets/back-end/img/warning-2.png') }}"></span>
+    <span id="get-product-stock-limit-message"
+          data-message-for-multiple="{{ translate('there_isn’t_enough_quantity_on_stock').' . '.translate('please_check_products_in_limited_stock').'.' }}"
+          data-message-for-three-plus-product="{{translate('_more_products_have_low_stock') }}"
+          data-message-for-one-product="{{translate('this_product_is_low_on_stock')}}">
+    </span>
+    <span id="get-product-stock-view"
+          data-stock-limit-page="{{route('vendor.products.stock-limit-list')}}"
+    >
+    </span>
 
     <script src="{{ dynamicAsset(path: 'public/assets/back-end/js/vendor.min.js') }}"></script>
     <script src="{{ dynamicAsset(path: 'public/assets/back-end/js/theme.min.js') }}"></script>
@@ -164,7 +166,21 @@
         if (/MSIE \d|Trident.*rv:/.test(navigator.userAgent)) document.write(
             '<script src="{{ dynamicAsset(path: 'public/assets/back-end') }}/vendor/babel-polyfill/polyfill.min.js"><\/script>');
     </script>
-
+    @if(env('APP_MODE') == 'demo')
+        <script>
+            'use strict'
+            function checkDemoResetTime() {
+                let currentMinute = new Date().getMinutes();
+                if (currentMinute > 55 && currentMinute <= 60) {
+                    $('#demo-reset-warning').addClass('active');
+                } else {
+                    $('#demo-reset-warning').removeClass('active');
+                }
+            }
+            checkDemoResetTime();
+            setInterval(checkDemoResetTime, 60000);
+        </script>
+    @endif
     @stack('script')
 
     <script src="{{ dynamicAsset(path: 'public/assets/back-end/js/admin/common-script.js') }}"></script>

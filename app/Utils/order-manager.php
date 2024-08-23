@@ -2,6 +2,9 @@
 
 namespace App\Utils;
 
+use App\Models\DigitalProductVariation;
+use App\Traits\PdfGenerator;
+use App\Models\Storage;
 use App\Utils\Helpers;
 use App\Events\OrderPlacedEvent;
 use App\Events\OrderStatusEvent;
@@ -23,7 +26,7 @@ use App\Models\ShippingType;
 use App\Models\Shop;
 use App\Models\Transaction;
 use App\Traits\CommonTrait;
-use App\User;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -31,7 +34,7 @@ use Illuminate\Support\Str;
 
 class OrderManager
 {
-    use CommonTrait;
+    use CommonTrait, PdfGenerator;
 
     public static function track_order($order_id)
     {
@@ -243,7 +246,7 @@ class OrderManager
                 $payer_id = $order->seller_id;
                 $payment_receiver_id = $order->seller_id;
                 $paid_to = 'seller';
-            }elseif ($order->free_delivery_bearer == 'admin' && $order->shipping_responsibility == 'sellerwise_shipping') {
+            }elseif ($order->free_delivery_bearer == 'admin' && $order->shipping_responsibility == 'inhouse_shipping') {
                 $paid_by = 'admin';
                 $payer_id = 1;
                 $payment_receiver_id = $order->seller_id;
@@ -359,8 +362,8 @@ class OrderManager
             $coupon_discount = $req['coupon_discount'];
         }
 
-        $carts = $req ? CartManager::get_cart_for_api($req) : CartManager::get_cart();
-        $group_id_wise_cart = CartManager::get_cart($data['cart_group_id']);
+        $carts = $req ? CartManager::get_cart_for_api(request: $req) : CartManager::get_cart();
+        $group_id_wise_cart = CartManager::get_cart(groupId: $data['cart_group_id']);
         $total_amount = 0;
         foreach ($carts as $cart) {
             if (($coupon->seller_id == NULL && $cart->seller_is == 'admin') || $coupon->seller_id == '0' || ($coupon->seller_id == $cart->seller_id && $cart->seller_is == 'seller')) {
@@ -370,13 +373,13 @@ class OrderManager
         }
 
         if (($group_id_wise_cart[0]->seller_is == 'admin' && $coupon->seller_id == NULL) || $coupon->seller_id == '0' || ($coupon->seller_id == $group_id_wise_cart[0]->seller_id && $group_id_wise_cart[0]->seller_is == 'seller')) {
-            $cart_group_ids = CartManager::get_cart_group_ids($req ?? null);
+            $cart_group_ids = CartManager::get_cart_group_ids(request: ($req ?? null));
             $discount = 0;
 
             if ($coupon->coupon_type == 'discount_on_purchase' || $coupon->coupon_type == 'first_order') {
                 $group_id_percent = array();
                 foreach ($cart_group_ids as $cart_group_id) {
-                    $cart_group_data = $req ? CartManager::get_cart_for_api($req, $cart_group_id) : CartManager::get_cart($cart_group_id);
+                    $cart_group_data = $req ? CartManager::get_cart_for_api(request: $req, groupId: $cart_group_id) : CartManager::get_cart(groupId: $cart_group_id);
                     $cart_group_amount = 0;
                     if ($coupon->seller_id == NULL || $coupon->seller_id == '0' || $coupon->seller_id == $cart_group_data[0]->seller_id) {
                         $cart_group_amount = $cart_group_data->sum(function ($item) {
@@ -393,7 +396,7 @@ class OrderManager
 
                 $free_shipping_by_group_id = array();
                 foreach ($cart_group_ids as $cart_group_id) {
-                    $cart_group_data = $req ? CartManager::get_cart_for_api($req, $cart_group_id) : CartManager::get_cart($cart_group_id);
+                    $cart_group_data = $req ? CartManager::get_cart_for_api(request: $req, groupId: $cart_group_id) : CartManager::get_cart(groupId: $cart_group_id);
 
                     if ($shippingMethod == 'inhouse_shipping') {
                         $admin_shipping = \App\Models\ShippingType::where('seller_id', 0)->first();
@@ -413,7 +416,7 @@ class OrderManager
                         $free_shipping_by_group_id[$cart_group_id] = $cart_group_data[0]->cart_shipping->shipping_cost ?? 0;
                     } else {
                         if (($coupon->seller_id == null && $cart_group_data[0]->seller_is == 'admin') || $coupon->seller_id == '0' || $coupon->seller_id == $cart_group_data[0]->seller_id) {
-                            $shipping_cost = CartManager::get_shipping_cost($data['cart_group_id']);
+                            $shipping_cost = CartManager::get_shipping_cost(groupId: $data['cart_group_id'], type: 'checked');
                             $free_shipping_by_group_id[$cart_group_id] = $shipping_cost;
                         }
                     }
@@ -444,9 +447,41 @@ class OrderManager
         $req = array_key_exists('request', $data) ? $data['request'] : null;
         $user = Helpers::get_customer($req);
 
-        $is_guest = ($user == 'offline') ? 1 : 0;
+        if ($user == 'offline' && isset($req['customer_id']) && isset($req['is_guest']) && $req['is_guest'] == 0) {
+            $userCheck = User::where(['id' => $req['customer_id']])->first();
+            $user = $userCheck ?? $user;
+        }
+
+        $isGuestUser = ($user == 'offline') ? 1 : 0;
         if ($req) {
-            $is_guest = isset($req['is_guest']) && $req['is_guest']  ? 1 : 0;
+            $isGuestUser = isset($req['is_guest']) && $req['is_guest']  ? 1 : 0;
+        }
+
+        $guest_id = session('guest_id');
+        if ($req) {
+            $guest_id = $req['is_guest'] ? $req['guest_id'] : 0;
+        }
+
+        $getCustomerID = $user == 'offline' ? $guest_id : $user->id;
+        if ($user == 'offline' && session('newCustomerRegister') && session('newRegisterCustomerInfo')) {
+            $addCustomer = session('newRegisterCustomerInfo');
+            $getCustomerID = $addCustomer['id'];
+            $isGuestUserInOrder = 0;
+
+            $customerID = session()->has('guest_id') ? session('guest_id') : 0;
+            ShippingAddress::where(['customer_id' => $customerID, 'is_guest' => 1, 'id' => session('address_id')])
+                ->update(['customer_id' => $getCustomerID, 'is_guest' => 0]);
+            ShippingAddress::where(['customer_id' => $customerID, 'is_guest' => 1, 'id' => session('billing_address_id')])
+                ->update(['customer_id' => $getCustomerID, 'is_guest' => 0]);
+
+        }elseif ($user == 'offline' && isset($data['newCustomerRegister'])) {
+            $getCustomerID = $data['newCustomerRegister'] ? $data['newCustomerRegister']['id'] : $guest_id;
+            $isGuestUserInOrder = $data['newCustomerRegister'] ? 0 : 1;
+        }elseif ($user == 'offline' && isset($data['new_customer_id'])) {
+            $getCustomerID = $data['new_customer_id'];
+            $isGuestUserInOrder = $data['new_customer_id'] ? 0 : 1;
+        }else {
+            $isGuestUserInOrder = $isGuestUser;
         }
 
         $coupon_process = array(
@@ -456,7 +491,7 @@ class OrderManager
             'coupon_type' => NULL,
         );
 
-        if (!$is_guest && (isset($req['coupon_code']) && $req['coupon_code']) || session()->has('coupon_code')) {
+        if (!$isGuestUser && (isset($req['coupon_code']) && $req['coupon_code']) || session()->has('coupon_code')) {
             $coupon_code = $req['coupon_code'] ?? session('coupon_code');
             $coupon = Coupon::where(['code' => $coupon_code])
                 ->where('status', 1)
@@ -487,7 +522,7 @@ class OrderManager
         $free_delivery = OrderManager::free_delivery_order_amount($cart_group_id);
         if($free_delivery['status'] && $free_delivery['shipping_cost_saved'] > 0  && $coupon_process['coupon_type'] !='free_delivery'){
             $is_shipping_free = 1;
-            $free_shipping_discount = CartManager::get_shipping_cost($data['cart_group_id']);
+            $free_shipping_discount = CartManager::get_shipping_cost(groupId: $data['cart_group_id'], type: 'checked');
             $free_shipping_type = 'free_shipping_over_order_amount';
             $free_shipping_responsibility = $free_delivery['responsibility'];
         }
@@ -521,19 +556,11 @@ class OrderManager
                 $shipping_type = isset($seller_shipping) == true ? $seller_shipping->shipping_type : 'order_wise';
             }
         }
-
-        $guest_id = session('guest_id');
-        if ($req) {
-            $guest_id = $req['is_guest'] ? $req['guest_id'] : 0;
-        }
-
-        $customer_id = $user == 'offline' ? $guest_id : $user->id;
-
         $or = [
             'id' => $order_id,
             'verification_code' => rand(100000, 999999),
-            'customer_id' => $customer_id,
-            'is_guest' => $is_guest,
+            'customer_id' => $getCustomerID,
+            'is_guest' => $isGuestUserInOrder,
             'seller_id' => $seller_data->seller_id,
             'seller_is' => $seller_data->seller_is,
             'customer_type' => 'customer',
@@ -548,14 +575,14 @@ class OrderManager
             'discount_type' => $discount_type,
             'coupon_code' => $coupon_code,
             'coupon_discount_bearer' => $coupon_bearer,
-            'order_amount' => CartManager::cart_grand_total($cart_group_id) - $discount - $free_shipping_discount,
+            'order_amount' => CartManager::cart_grand_total(cartGroupId: $cart_group_id, type: 'checked') - $discount - $free_shipping_discount,
             'admin_commission' => $admin_commission,
             'shipping_address' => $address_id,
             'shipping_address_data' => ShippingAddress::find($address_id),
             'billing_address' => $billing_address_id,
             'billing_address_data' => ShippingAddress::find($billing_address_id),
             'shipping_responsibility' => Helpers::get_business_settings('shipping_method'),
-            'shipping_cost' => CartManager::get_shipping_cost($data['cart_group_id']),
+            'shipping_cost' => CartManager::get_shipping_cost(groupId: $data['cart_group_id'], type: 'checked'),
             'extra_discount' => $free_shipping_discount,
             'extra_discount_type' => $free_shipping_type,
             'free_delivery_bearer' => $seller_data->seller_is == 'seller' ? $free_shipping_responsibility : 'admin',
@@ -576,26 +603,47 @@ class OrderManager
             ]);
         }
 
-//        confirmed
+        // confirmed
         DB::table('orders')->insertGetId($or);
-        self::add_order_status_history($order_id, $customer_id, $data['payment_status'] == 'paid' ? 'confirmed' : 'pending', 'customer');
+        self::add_order_status_history($order_id, $getCustomerID, $data['payment_status'] == 'paid' ? 'confirmed' : 'pending', 'customer');
 
-        foreach (CartManager::get_cart($data['cart_group_id']) as $c) {
-            $product = Product::where(['id' => $c['product_id']])->first();
-            $price = $c['tax_model'] == 'include' ? $c['price'] - $c['tax'] : $c['price'];
-            $or_d = [
+        foreach (CartManager::get_cart(groupId: $data['cart_group_id'], type: 'checked') as $cartSingleItem) {
+            $product = Product::where(['id' => $cartSingleItem['product_id']])->with('digitalVariation')->first()->toArray();
+            unset($product['is_shop_temporary_close']);
+            unset($product['thumbnail_full_url']);
+            unset($product['color_images_full_url']);
+            unset($product['meta_image_full_url']);
+            unset($product['images_full_url']);
+            unset($product['reviews']);
+            unset($product['translations']);
+
+            $digitalProductVariation = DigitalProductVariation::with(['storage'])->where(['product_id' => $cartSingleItem['product_id'], 'variant_key' => $cartSingleItem['variant']])->first();
+            if ($product['digital_product_type'] == 'ready_product' && $digitalProductVariation) {
+                $getStoragePath = Storage::where([
+                    'data_id' => $digitalProductVariation['id'],
+                    "data_type" => "App\Models\DigitalProductVariation",
+                ])->first();
+
+                $product['digital_file_ready'] = $digitalProductVariation['file'];
+                $product['storage_path'] = $getStoragePath ? $getStoragePath['value'] : 'public';
+            } elseif ($product['digital_product_type'] == 'ready_product' && !empty($product['digital_file_ready'])) {
+                $product['storage_path'] = $product['digital_file_ready_storage_type'] ??  'public';
+            }
+
+            $price = $cartSingleItem['tax_model'] == 'include' ? $cartSingleItem['price'] - $cartSingleItem['tax'] : $cartSingleItem['price'];
+            $orderDetails = [
                 'order_id' => $order_id,
-                'product_id' => $c['product_id'],
-                'seller_id' => $c['seller_id'],
-                'product_details' => $product,
-                'qty' => $c['quantity'],
+                'product_id' => $cartSingleItem['product_id'],
+                'seller_id' => $cartSingleItem['seller_id'],
+                'product_details' => json_encode($product),
+                'qty' => $cartSingleItem['quantity'],
                 'price' => $price,
-                'tax' => $c['tax'] * $c['quantity'],
-                'tax_model' => $c['tax_model'],
-                'discount' => $c['discount'] * $c['quantity'],
+                'tax' => $cartSingleItem['tax'] * $cartSingleItem['quantity'],
+                'tax_model' => $cartSingleItem['tax_model'],
+                'discount' => $cartSingleItem['discount'] * $cartSingleItem['quantity'],
                 'discount_type' => 'discount_on_product',
-                'variant' => $c['variant'],
-                'variation' => $c['variations'],
+                'variant' => $cartSingleItem['variant'],
+                'variation' => $cartSingleItem['variations'],
                 'delivery_status' => 'pending',
                 'shipping_method_id' => null,
                 'payment_status' => 'unpaid',
@@ -603,14 +651,14 @@ class OrderManager
                 'updated_at' => now()
             ];
 
-            if ($c['variant'] != null) {
-                $type = $c['variant'];
+            if ($cartSingleItem['variant'] != null) {
+                $type = $cartSingleItem['variant'];
                 $var_store = [];
                 foreach (json_decode($product['variation'], true) as $var) {
                     if ($type == $var['type']) {
-                        $var['qty'] -= $c['quantity'];
+                        $var['qty'] -= $cartSingleItem['quantity'];
                     }
-                    array_push($var_store, $var);
+                    $var_store[] = $var;
                 }
                 Product::where(['id' => $product['id']])->update([
                     'variation' => json_encode($var_store),
@@ -618,14 +666,14 @@ class OrderManager
             }
 
             Product::where(['id' => $product['id']])->update([
-                'current_stock' => $product['current_stock'] - $c['quantity']
+                'current_stock' => $product['current_stock'] - $cartSingleItem['quantity']
             ]);
 
-            DB::table('order_details')->insert($or_d);
+            DB::table('order_details')->insert($orderDetails);
 
         }
 
-        $order = Order::with('customer', 'seller.shop')->find($order_id);
+        $order = Order::with('customer', 'seller.shop','details')->find($order_id);
         if ($or['payment_method'] != 'cash_on_delivery' && $or['payment_method'] != 'offline_payment') {
             $order_summary = OrderManager::order_summary($order);
             $order_amount = $order_summary['subtotal'] - $order_summary['total_discount_on_product'] - $order['discount'];
@@ -695,36 +743,54 @@ class OrderManager
                 event(new OrderPlacedEvent(notification: $notification));
             }
         }
+
         try {
             $emailServices_smtp = Helpers::get_business_settings('mail_config');
             if ($emailServices_smtp['status'] == 0) {
                 $emailServices_smtp = Helpers::get_business_settings('mail_config_sendgrid');
             }
             if ($emailServices_smtp['status'] == 1) {
-                if($is_guest) {
+                if($isGuestUser) {
                     $offline_user = ShippingAddress::where('id', $address_id)->first();
                     if(!$offline_user) {
                         $offline_user = ShippingAddress::find($billing_address_id);
                     }
                     $email = $offline_user['email'];
+                    $userName = $offline_user['contact_person_name'];
                 }else{
                     if ($req) {
-                        $email = User::find($customer_id)['email'];
+                        $getLoggedUser = User::find($getCustomerID);
+                        $email = $getLoggedUser['email'];
+                        $userName = $getLoggedUser['f_name'];
                     }else{
                         $email = $user['email'];
+                        $userName = $user['f_name'];
                     }
                 }
-                $emailInfo = (object)[
-                    'email'=>$email,
-                    'orderId'=>$order_id,
+                $data = [
+                    'subject' => translate('order_placed'),
+                    'title' => translate('order_placed'),
+                    'userName' => $userName,
+                    'userType' => 'customer',
+                    'templateName' => 'order-place',
+                    'order' => $order,
+                    'orderId' => $order_id,
+                    'shopName' => $seller?->shop?->name ?? getWebConfig('company_name'),
+                    'shopId' => $seller?->shop?->id ?? 0,
+                    'attachmentPath' =>self::storeInvoice($order_id),
                 ];
-                event(new OrderPlacedEvent(emailInfo: $emailInfo));
-
-                $sellerEmailInfo = (object)[
-                    'email'=>$seller->email,
-                    'orderId'=>$order_id,
+                event(new OrderPlacedEvent(email: $email, data: $data));
+                $dataForVendor = [
+                    'subject' => translate('new_order_received'),
+                    'title' => translate('new_order_received'),
+                    'userType' => $seller_data->seller_is == 'admin' ? 'admin' : 'vendor',
+                    'templateName' => 'order-received',
+                    'order' => $order,
+                    'orderId' => $order_id,
+                    'vendorName' => $seller?->f_name,
+                    'adminName' => $seller?->name,
                 ];
-                event(new OrderPlacedEvent(emailInfo: $sellerEmailInfo));
+                event(new OrderPlacedEvent(email: $seller->email, data: $dataForVendor));
             }
         } catch (\Exception $exception) {
 
@@ -807,7 +873,7 @@ class OrderManager
 
         //order data insert
         self::order_insert($order_data);
-        $order = Order::with('customer')->where($order_data['order_id'])->first();
+        $order = Order::with('customer','details')->where($order_data['order_id'])->first();
         $seller = $seller_data->seller_is == 'admin' ? Admin::find($seller_data->seller_id) : Seller::find($seller_data->seller_id);
         if($seller_data->seller_is == 'seller') {
             OrderStatusEvent::dispatch('new_order_message', 'seller', $order);
@@ -823,17 +889,30 @@ class OrderManager
                 $emailServices_smtp = Helpers::get_business_settings('mail_config_sendgrid');
             }
             if ($emailServices_smtp['status'] == 1) {
-                $emailInfo = (object)[
-                    'email'=>$user->email,
+                $data = [
+                    'subject' => translate('order_placed'),
+                    'title' => translate('order_placed'),
+                    'userName' => $user['f_name'],
+                    'userType' => 'customer',
+                    'templateName' => 'order-place',
+                    'order' =>$order,
                     'orderId'=>$order_id,
+                    'shopName' => $seller?->shop?->name ?? getWebConfig('company_name'),
+                    'shopId' => $seller?->shop?->id ?? 0,
+                    'attachmentPath' =>self::storeInvoice($order_id),
                 ];
-                event(new OrderPlacedEvent(emailInfo: $emailInfo));
-
-                $sellerEmailInfo = (object)[
-                    'email'=>$seller->email,
+                event(new OrderPlacedEvent(email: $user['email'],data: $data));
+                $dataForVendor = [
+                    'subject' => translate('new_order_received'),
+                    'title' => translate('new_order_received'),
+                    'userType' =>  $seller_data->seller_is == 'admin' ? 'admin':'vendor',
+                    'templateName' => 'order-received',
+                    'order' =>$order,
                     'orderId'=>$order_id,
+                    'vendorName' => $seller?->f_name,
+                    'adminName' => $seller?->name,
                 ];
-                event(new OrderPlacedEvent(emailInfo: $sellerEmailInfo));
+                event(new OrderPlacedEvent(email: $seller->email,data: $dataForVendor));
             }
         } catch (\Exception $exception) {
             dd($exception);
@@ -869,13 +948,13 @@ class OrderManager
             'discount_type' => $order_data['discount'] == 0 ? null : 'coupon_discount',
             'coupon_code' => $order_data['coupon_code'],
             'coupon_discount_bearer' => $order_data['coupon_bearer'],
-            'order_amount' => CartManager::cart_grand_total($order_data['cart_group_id']) - $order_data['discount'],
+            'order_amount' => CartManager::cart_grand_total(cartGroupId: $order_data['cart_group_id'], type: 'checked') - $order_data['discount'],
             'admin_commission' => $order_data['admin_commission'],
             'shipping_address' => $order_data['address_id'],
             'shipping_address_data' => ShippingAddress::find($order_data['address_id']),
             'billing_address' => $order_data['billing_address_id'],
             'billing_address_data' => ShippingAddress::find($order_data['billing_address_id']),
-            'shipping_cost' => CartManager::get_shipping_cost($order_data['data']['cart_group_id']),
+            'shipping_cost' => CartManager::get_shipping_cost(groupId: $order_data['data']['cart_group_id'], type: 'checked'),
             'shipping_method_id' => $order_data['shipping_method_id'],
             'shipping_type' => $order_data['shipping_type'],
             'created_at' => now(),
@@ -889,10 +968,10 @@ class OrderManager
         self::add_order_status_history($order_data['order_id'], auth('customer')->id(), $order_data['data']['payment_status'] == 'paid' ? 'confirmed' : 'pending', 'customer');
 
         //order products info insert into order_details table start
-        foreach (CartManager::get_cart($order_data['data']['cart_group_id']) as $c) {
+        foreach (CartManager::get_cart(groupId: $order_data['data']['cart_group_id']) as $c) {
             $product = Product::where(['id' => $c['product_id']])->first();
             $price = $c['tax_model'] == 'include' ? $c['price'] - $c['tax'] : $c['price'];
-            $or_d = [
+            $orderDetails = [
                 'order_id' => $order_data['order_id'],
                 'product_id' => $c['product_id'],
                 'seller_id' => $c['seller_id'],
@@ -931,7 +1010,7 @@ class OrderManager
                 'current_stock' => $product['current_stock'] - $c['quantity']
             ]);
 
-            DB::table('order_details')->insert($or_d);
+            DB::table('order_details')->insert($orderDetails);
         }
         //order products info insert into order_details table end
 
@@ -992,7 +1071,7 @@ class OrderManager
         $failedAddToCartCount = 0;
 
         foreach ($orderProducts as $key => $orderProduct) {
-            $product = Product::active()->find($orderProduct->product_id);
+            $product = Product::active()->where(['id' => $orderProduct->product_id])->with(['digitalVariation'])->first();
 
             if ($product) {
                 $productValid = true;
@@ -1018,7 +1097,9 @@ class OrderManager
                         } else {
                             $i = 1;
                             foreach ($variation as $index => $var) {
-                                $choices['choice_' . $i] = $var;
+                                if ($var) {
+                                    $choices['choice_' . $i] = $var;
+                                }
                                 $i++;
                             }
                         }
@@ -1053,6 +1134,22 @@ class OrderManager
                         $price = $product->unit_price;
                     }
 
+                    if ($product->product_type == 'digital') {
+                        if ($product->digital_product_type == "ready_after_sell") {
+                            $price = $product->unit_price;
+                        } elseif ($product->digital_product_type == "ready_product" && !empty($product->digital_file_ready)) {
+                            $price = $product->unit_price;
+                        } elseif ($product->digital_product_type == "ready_product" && empty($product->digital_file_ready) && $product->digitalVariation) {
+                            $productValid = false;
+                            foreach ($product->digitalVariation as $digitalVariation) {
+                                if ($digitalVariation['variant_key'] == $orderProduct['variant']) {
+                                    $price = $digitalVariation['price'];
+                                    $productValid = true;
+                                }
+                            }
+                        }
+                    }
+
                     $tax = Helpers::tax_calculation(product: $product, price: $price, tax: $product['tax'], tax_type: 'percent');
                     if ($productValid && $price != 0) {
                         $cartExist = Cart::where(['customer_id' => $user->id, 'variations' => $orderProduct->variation, 'product_id' => $orderProduct->product_id])->first();
@@ -1065,7 +1162,7 @@ class OrderManager
                             $cart['product_id'] = $orderProduct->product_id;
                             $cart['product_type'] = $product->product_type;
                             $cart['choices'] = json_encode($choices);
-                            $cart['variations'] = $orderProduct->variation;
+                            $cart['variations'] = !is_null($color) || !empty($choices) ? $orderProduct->variation : json_encode([]);
                             $cart['variant'] = $orderProduct->variant;
                             $cart['customer_id'] = $user->id ?? 0;
                             $cart['quantity'] = $orderProductQuantity;
@@ -1074,6 +1171,7 @@ class OrderManager
                             $cart['tax_model'] = $product->tax_model;
                             $cart['slug'] = $product->slug;
                             $cart['name'] = $product->name;
+                            $cart['is_checked'] = 1;
                             $cart['discount'] = Helpers::get_product_discount($product, $price);
                             $cart['thumbnail'] = $product->thumbnail;
                             $cart['seller_id'] = ($product->added_by == 'admin') ? 1 : $product->user_id;
@@ -1104,14 +1202,15 @@ class OrderManager
                             $cart['shipping_type'] = $shippingType;
                             $cart->save();
                         } else {
+                            $cart['is_checked'] = 1;
                             $cartExist->quantity = $orderProductQuantity;
                             $cartExist->save();
                         }
                         $addToCartCount++;
-                    }else {
+                    } else {
                         $failedAddToCartCount++;
                     }
-                }else {
+                } else {
                     $failedAddToCartCount++;
                 }
             }
@@ -1124,40 +1223,41 @@ class OrderManager
         ];
     }
 
-    public static function minimum_order_amount_verify($request, $cart_group_id = null)
+    public static function minimum_order_amount_verify($request, $cart_group_id = null): array
     {
         $user = Helpers::get_customer($request);
         $status = 1;
         $amount = 0;
         $messages = [];
-        $minimum_order_amount = 0;
-        $minimum_order_amount_status = Helpers::get_business_settings('minimum_order_amount_status');
+        $minimumOrderAmount = 0;
+        $minimumOrderAmountStatus = Helpers::get_business_settings('minimum_order_amount_status');
         $minimum_order_amount_by_seller = Helpers::get_business_settings('minimum_order_amount_by_seller');
         $inhouse_minimum_order_amount = Helpers::get_business_settings('minimum_order_amount');
         $decimal_point_settings = Helpers::get_business_settings('decimal_point_settings');
 
-        if($minimum_order_amount_status) {
+        if($minimumOrderAmountStatus) {
             $query = Cart::with(['seller', 'allProducts'])
                 ->where([
                     'customer_id' => ($user == 'offline' ? (session('guest_id') ?? $request->guest_id) : $user->id),
                     'is_guest' => ($user == 'offline' ? 1 : '0'),
+                    'is_checked' => 1,
                 ]);
             if ($cart_group_id) {
                 $cart_item = $query->where('cart_group_id', $cart_group_id)->first();
 
                 if(isset($cart_item) && $cart_item->allProducts) {
                     if ($cart_item->allProducts->added_by == 'admin') {
-                        $minimum_order_amount = $inhouse_minimum_order_amount;
+                        $minimumOrderAmount = $inhouse_minimum_order_amount;
                     } else {
-                        $minimum_order_amount = $minimum_order_amount_by_seller ? (isset($cart_item->seller->minimum_order_amount) ? $cart_item->seller->minimum_order_amount : 0) : 0;
+                        $minimumOrderAmount = $minimum_order_amount_by_seller ? (isset($cart_item->seller->minimum_order_amount) ? $cart_item->seller->minimum_order_amount : 0) : 0;
                     }
 
-                    $amount = CartManager::cart_grand_total($cart_group_id);
-                    $status = $minimum_order_amount > $amount ? 0 : 1;
+                    $amount = CartManager::cart_grand_total(cartGroupId: $cart_group_id, type: 'checked');
+                    $status = $minimumOrderAmount > $amount ? 0 : 1;
 
-                    if($minimum_order_amount > $amount) {
+                    if($minimumOrderAmount > $amount) {
                         $shopIdentity = $cart_item->allProducts->added_by == 'admin' ? getWebConfig(name: 'company_name') : $cart_item->seller->shop->name;
-                        $messages[] = translate('minimum_Order_Amount').' '.webCurrencyConverter(amount: $minimum_order_amount).' '.translate('for').' '.$shopIdentity;
+                        $messages[] = translate('minimum_Order_Amount').' '.webCurrencyConverter(amount: $minimumOrderAmount).' '.translate('for').' '.$shopIdentity;
                     }
                 }
             } else {
@@ -1165,16 +1265,16 @@ class OrderManager
                 foreach ($cart_groups as $group_key => $cart_group) {
                     $seller = $cart_group[0]->seller_is;
                     if ($seller == 'admin') {
-                        $minimum_order_amount = $inhouse_minimum_order_amount;
+                        $minimumOrderAmount = $inhouse_minimum_order_amount;
                     } else {
-                        $minimum_order_amount = $minimum_order_amount_by_seller ? (isset($cart_group[0]->seller->minimum_order_amount) ? $cart_group[0]->seller->minimum_order_amount : 0) : 0;
+                        $minimumOrderAmount = $minimum_order_amount_by_seller ? (isset($cart_group[0]->seller->minimum_order_amount) ? $cart_group[0]->seller->minimum_order_amount : 0) : 0;
                     }
 
-                    $new_amount = CartManager::cart_grand_total($group_key);
-                    if($minimum_order_amount > $new_amount) {
+                    $new_amount = CartManager::cart_grand_total(cartGroupId: $group_key, type: 'checked');
+                    if($minimumOrderAmount > $new_amount) {
                         $status = 0;
                         $shopIdentity = $seller == 'admin' ? getWebConfig(name: 'company_name') : $cart_group[0]->seller->shop->name;
-                        $messages[] = translate('minimum_Order_Amount').' '.webCurrencyConverter(amount: $minimum_order_amount).' '.translate('for').' '.$shopIdentity;
+                        $messages[] = translate('minimum_Order_Amount').' '.webCurrencyConverter(amount: $minimumOrderAmount).' '.translate('for').' '.$shopIdentity;
                     }
                     $amount = $amount + $new_amount;
                 }
@@ -1182,7 +1282,7 @@ class OrderManager
         }
 
         return [
-            'minimum_order_amount'  =>  $minimum_order_amount ?? 0,
+            'minimum_order_amount'  =>  $minimumOrderAmount ?? 0,
             'amount'                =>  $amount ? floatval($amount) : 0,
             'status'                =>  $status,
             'messages'              =>  $messages,
@@ -1190,61 +1290,145 @@ class OrderManager
         ];
     }
 
-
-    public static function free_delivery_order_amount($cart_group_id = null)
+    public static function checkSingleProductMinimumOrderAmountVerify($request, $product, $totalAmount): array
     {
-        $free_delivery = [
-            'status'=> 0, // full-fill the requirement if status is 1
-            'amount'=> 0, // free delivery amount
-            'percentage'=> 0, // completed percentage
-            'amount_need'=> 0, // need amount for free delivery
+        $status = 1;
+        $message = '';
+        $minimumOrderAmount = 0;
+        $minimumOrderAmountStatus = getWebConfig(name: 'minimum_order_amount_status');
+        $minimumOrderAmountBySeller = getWebConfig(name: 'minimum_order_amount_by_seller');
+        $inhouseMinimumOrderAmount = getWebConfig(name: 'minimum_order_amount');
+
+        if ($minimumOrderAmountStatus) {
+            if ($product->added_by == 'admin') {
+                $minimumOrderAmount = $inhouseMinimumOrderAmount;
+            } else {
+                $minimumOrderAmount = $minimumOrderAmountBySeller ? ($product->seller->minimum_order_amount ?? 0) : 0;
+            }
+            $status = $minimumOrderAmount > $totalAmount ? 0 : 1;
+
+            if ($minimumOrderAmount > $totalAmount) {
+                $shopIdentity = $product->added_by == 'admin' ? getWebConfig(name: 'company_name') : $product->seller->shop->name;
+                $message = translate('minimum_Order_Amount') . ' ' . webCurrencyConverter(amount: $minimumOrderAmount) . ' ' . translate('for') . ' ' . $shopIdentity;
+            }
+        }
+
+        return [
+            'minimum_order_amount' => $minimumOrderAmount,
+            'amount' => $totalAmount,
+            'added_by' => $product->added_by,
+            'status' => $status,
+            'message' => $message,
+        ];
+    }
+
+    public static function free_delivery_order_amount($cart_group_id = null): array
+    {
+        $freeDeliveryData = [
+            'status' => 0, // full-fill the requirement if status is 1
+            'amount' => 0, // free delivery amount
+            'percentage' => 0, // completed percentage
+            'amount_need' => 0, // need amount for free delivery
             'shipping_cost_saved' => 0,
             'cart_id' => $cart_group_id
         ];
 
-        $free_delivery['status'] = Helpers::get_business_settings('free_delivery_status');
-        $free_delivery['responsibility'] = Helpers::get_business_settings('free_delivery_responsibility');
-        $free_delivery_over_amount = Helpers::get_business_settings('free_delivery_over_amount');
-        $free_delivery_over_amount_seller = Helpers::get_business_settings('free_delivery_over_amount_seller');
+        $freeDeliveryData['status'] = Helpers::get_business_settings('free_delivery_status');
+        $freeDeliveryData['responsibility'] = Helpers::get_business_settings('free_delivery_responsibility');
+        $freeDeliveryOverAmount = Helpers::get_business_settings('free_delivery_over_amount');
+        $freeDeliveryOverAmountSeller = Helpers::get_business_settings('free_delivery_over_amount_seller');
 
-        if($free_delivery['status'] && $cart_group_id)
-        {
-            $get_cart = Cart::where(['product_type'=>'physical'])->where('cart_group_id', $cart_group_id)->first();
+        if ($freeDeliveryData['status'] && $cart_group_id) {
+            $getCartList = Cart::where(['product_type' => 'physical', 'cart_group_id' => $cart_group_id, 'is_checked' => 1])->first();
 
-            if($get_cart)
-            {
-                if($get_cart->seller_is == 'admin')
-                {
-                    $free_delivery['amount'] = $free_delivery_over_amount;
-                    $free_delivery['status'] = $free_delivery_over_amount > 0 ? 1:0;
-                }else{
-                    $seller = Seller::where('id', $get_cart->seller_id)->first();
-                    $free_delivery['status'] = $seller->free_delivery_status ?? 0;
+            if ($getCartList) {
+                if ($getCartList->seller_is == 'admin') {
+                    $freeDeliveryData['amount'] = $freeDeliveryOverAmount;
+                    $freeDeliveryData['status'] = $freeDeliveryOverAmount > 0 ? 1 : 0;
+                } else {
+                    $seller = Seller::where('id', $getCartList->seller_id)->first();
+                    $freeDeliveryData['status'] = $seller->free_delivery_status ?? 0;
 
-                    if($free_delivery['responsibility'] == 'admin')
-                    {
-                        $free_delivery['amount'] = $free_delivery_over_amount_seller;
-                        $free_delivery['status'] = $free_delivery_over_amount_seller > 0 ? 1:0;
+                    if ($freeDeliveryData['responsibility'] == 'admin') {
+                        $freeDeliveryData['amount'] = $freeDeliveryOverAmountSeller;
+                        $freeDeliveryData['status'] = $freeDeliveryOverAmountSeller > 0 ? 1 : 0;
                     }
 
-                    if($free_delivery['responsibility'] == 'seller' && $free_delivery['status'] == 1){
-                        $free_delivery['amount'] = $seller->free_delivery_over_amount;
-                        $free_delivery['status'] = $seller->free_delivery_over_amount > 0 ? 1:0;
+                    if ($freeDeliveryData['responsibility'] == 'seller' && $freeDeliveryData['status'] == 1) {
+                        $freeDeliveryData['amount'] = $seller->free_delivery_over_amount;
+                        $freeDeliveryData['status'] = $seller->free_delivery_over_amount > 0 ? 1 : 0;
                     }
                 }
 
-                $amount = CartManager::cart_grand_total_without_shipping_charge($get_cart->cart_group_id);
-                $free_delivery['amount_need'] = $free_delivery['amount'] - $amount;
-                $free_delivery['percentage'] = ($free_delivery['amount'] > 0) && $amount > 0 && ($free_delivery['amount'] >= $amount) ? number_format(($amount/ $free_delivery['amount']) * 100) : 100;
-                if($free_delivery['status'] == 1 && $free_delivery['percentage'] == 100)
-                {
-                    $free_delivery['shipping_cost_saved'] = CartManager::get_shipping_cost($get_cart->cart_group_id);
+                $amount = CartManager::getCartGrandTotalWithoutShippingCharge(cartGroupId : $getCartList->cart_group_id, type: 'checked');
+                $freeDeliveryData['amount_need'] = $freeDeliveryData['amount'] - $amount;
+                $freeDeliveryData['percentage'] = ($freeDeliveryData['amount'] > 0) && $amount > 0 && ($freeDeliveryData['amount'] >= $amount) ? number_format(($amount / $freeDeliveryData['amount']) * 100) : 100;
+                if ($freeDeliveryData['status'] == 1 && $freeDeliveryData['percentage'] == 100) {
+                    $freeDeliveryData['shipping_cost_saved'] = CartManager::get_shipping_cost(groupId: $getCartList->cart_group_id, type: 'checked');
                 }
-            }else{
-                $free_delivery['status'] = 0;
+            } else {
+                $freeDeliveryData['status'] = 0;
             }
         }
 
-        return $free_delivery;
+        return $freeDeliveryData;
+    }
+
+
+    public static function storeInvoice($id):string
+    {
+        $order = Order::with('seller')->with('shipping')->where('id', $id)->first();
+        $invoiceSettings =  getWebConfig('invoice_settings');
+        $mpdf_view = \View::make(VIEW_FILE_NAMES['order_invoice'], compact('order','invoiceSettings'));
+        return self::storePdf(view: $mpdf_view, filePrefix: 'order_invoice_', filePostfix: $order['id'], pdfType: 'invoice', requestFrom: 'web');
+    }
+
+    public static function getOrderTotalPriceSummary($order): array
+    {
+        $itemPrice = 0;
+        $subTotal = 0;
+        $total = 0;
+        $taxTotal = 0;
+        $itemDiscount = 0;
+        $totalProductPrice = 0;
+        $couponDiscount = 0;
+        $deliveryFeeDiscount = 0;
+        $totalItemQuantity = 0;
+
+        foreach ($order->details as $detailKey => $detail) {
+            $itemPrice += $detail['price'] * $detail['qty'];
+            $subTotal += $detail['price'] * $detail['qty'];
+            $productPrice = $detail['price'] * $detail['qty'];
+            $totalProductPrice += $productPrice;
+            $itemDiscount += $detail['discount'];
+            $taxTotal += $detail['tax'];
+            $totalItemQuantity += $detail['qty'];
+        }
+        $total = $itemPrice + $taxTotal - $itemDiscount;
+        $shipping = $order['shipping_cost'];
+
+        if ($order['extra_discount_type'] == 'percent') {
+            $extraDiscount = (($totalProductPrice) / 100) * $order['extra_discount'];
+        } else {
+            $extraDiscount = $order['extra_discount'];
+        }
+        if (isset($order['discount_amount'])) {
+            $couponDiscount = $order['discount_amount'];
+        }
+        if ($order['is_shipping_free'] == 1) {
+            $deliveryFeeDiscount = $shipping;
+        }
+
+        return [
+            'itemPrice' => $itemPrice,
+            'subTotal' => $subTotal - $itemDiscount,
+            'itemDiscount' => $itemDiscount,
+            'extraDiscount' => $extraDiscount,
+            'couponDiscount' => $couponDiscount,
+            'taxTotal' => $taxTotal,
+            'shippingTotal' => $shipping,
+            'totalItemQuantity' => $totalItemQuantity,
+            'totalAmount' => ($total + $shipping - $extraDiscount - $couponDiscount),
+        ];
     }
 }

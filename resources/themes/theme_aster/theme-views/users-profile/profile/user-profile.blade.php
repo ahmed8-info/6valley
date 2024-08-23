@@ -120,7 +120,7 @@
                                                 <div
                                                     class="card-header gap-2 align-items-center d-flex justify-content-between">
                                                     <h6>{{translate($address['address_type'])}}
-                                                        ({{ $address['is_billing'] === 1 ? translate('billing_address'):translate('shipping_address')}})</h6>
+                                                        ({{ $address['is_billing'] == 1 ? translate('billing_address'):translate('shipping_address')}})</h6>
                                                     <div class="d-flex align-items-center gap-3">
                                                         <a href="{{route('address-edit',$address->id)}}" class="p-0 bg-transparent border-0">
                                                             <img src="{{theme_asset('assets/img/svg/location-edit.svg')}}"

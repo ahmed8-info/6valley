@@ -2,7 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Admin;
 use App\Models\Brand;
+use App\Models\EmailTemplate;
+use App\Models\HelpTopic;
+use App\Models\Product;
+use App\Models\VendorRegistrationReason;
+use App\Traits\EmailTemplateTrait;
 use App\Utils\Helpers;
 use App\Models\ShippingType;
 use App\Models\BusinessSetting;
@@ -17,7 +23,7 @@ use Illuminate\Support\Facades\URL;
 
 class InstallController extends Controller
 {
-    use ActivationClass;
+    use ActivationClass,EmailTemplateTrait;
 
     public function step0()
     {
@@ -54,8 +60,10 @@ class InstallController extends Controller
             shell_exec('ln -s ../resources/themes themes');
             Artisan::call('storage:link');
         }
-        //end symlink
 
+        //end symlink
+        self::updateRobotTexFile();
+        Artisan::call('file:permission');
         Artisan::call('config:cache');
         Artisan::call('config:clear');
         return view('installation.step5');
@@ -509,11 +517,277 @@ class InstallController extends Controller
             ]
         );
 
+        //priority setup and vendor registration data process
+        $this->getPrioritySetupAndVendorRegistrationData();
+
+        if(Admin::count()>0 && EmailTemplate::count()<1){
+            $emailTemplateUserData = [
+                'admin',
+                'customer',
+                'vendor',
+                'delivery-man',
+            ];
+            foreach ($emailTemplateUserData as $key=>$value){
+                $this->getEmailTemplateDataForUpdate($value);
+            }
+        }
+
+        DB::table('business_settings')->updateOrInsert(['type' => 'storage_connection_type'],
+            [
+                'type' => 'storage_connection_type',
+                'value' => 'public',
+                'updated_at' => now()
+            ]
+        );
+
+        DB::table('business_settings')->updateOrInsert(['type' => 'google_search_console_code'],
+            [
+                'type' => 'google_search_console_code',
+                'value' => '',
+                'updated_at' => now()
+            ]
+        );
+
+        DB::table('business_settings')->updateOrInsert(['type' => 'bing_webmaster_code'],
+            [
+                'type' => 'bing_webmaster_code',
+                'value' => '',
+                'updated_at' => now()
+            ]
+        );
+
+        DB::table('business_settings')->updateOrInsert(['type' => 'baidu_webmaster_code'],
+            [
+                'type' => 'baidu_webmaster_code',
+                'value' => '',
+                'updated_at' => now()
+            ]
+        );
+
+        DB::table('business_settings')->updateOrInsert(['type' => 'yandex_webmaster_code'],
+            [
+                'type' => 'yandex_webmaster_code',
+                'value' => '',
+                'updated_at' => now()
+            ]
+        );
+
         $previousRouteServiceProvier = base_path('app/Providers/RouteServiceProvider.php');
         $newRouteServiceProvier = base_path('app/Providers/RouteServiceProvider.txt');
         copy($newRouteServiceProvier, $previousRouteServiceProvier);
         //sleep(5);
         return view('installation.step6');
+    }
+
+    public static function updateRobotTexFile(): void
+    {
+        try {
+            $path = DOMAIN_POINTED_DIRECTORY == 'public' ? public_path('robots.txt') : base_path('robots.txt');
+            if (!File::exists($path)) {
+                fopen($path, "w") or die("Unable to open file!");
+            }
+            $content = "User-agent: *\nDisallow: /login/admin/\nSitemap: " . url('/sitemap.xml');
+            if (!File::exists($path)) {
+                File::put($path, '');
+            }
+            File::put($path, $content);
+        }catch (\Exception $exception){
+        }
+    }
+
+
+    public static function getPrioritySetupAndVendorRegistrationData()
+    {
+        if (BusinessSetting::where(['type' => 'vendor_registration_header'])->first() == false) {
+            DB::table('business_settings')->updateOrInsert(["type" => "vendor_registration_header"], [
+                "value" => json_encode([
+                    "title" => "Vendor Registration",
+                    "sub_title" => "Create your own store.Already have store?",
+                    "image" => ""
+                ]),
+            ]);
+        }
+
+        if (BusinessSetting::where(['type' => 'vendor_registration_sell_with_us'])->first() == false) {
+            DB::table('business_settings')->updateOrInsert(["type" => "vendor_registration_sell_with_us"], [
+                "value" => json_encode([
+                    "title" => "Why Sell With Us",
+                    "sub_title" => "Boost your sales! Join us for a seamless, profitable experience with vast buyer reach and top-notch support. Sell smarter today!",
+                    "image" => ""
+                ]),
+            ]);
+        }
+
+        if (BusinessSetting::where(['type' => 'download_vendor_app'])->first() == false) {
+            DB::table('business_settings')->updateOrInsert(["type" => "download_vendor_app"], [
+                "value" => json_encode([
+                    "title" => "Download Free Vendor App",
+                    "sub_title" => "Download our free seller app and start reaching millions of buyers on the go! Easy setup, manage listings, and boost sales anywhere.",
+                    "image" => null,
+                    "download_google_app" => null,
+                    "download_google_app_status" => 0,
+                    "download_apple_app" => null,
+                    "download_apple_app_status" => 0,
+                ]),
+            ]);
+        }
+
+        if (BusinessSetting::where(['type' => 'business_process_main_section'])->first() == false) {
+            DB::table('business_settings')->updateOrInsert(["type" => "business_process_main_section"], [
+                "value" => json_encode([
+                    "title" => "3 Easy Steps To Start Selling",
+                    "sub_title" => "Start selling quickly! Register, upload your products with detailed info and images, and reach millions of buyers instantly.",
+                    "image" => ""
+                ]),
+            ]);
+        }
+
+        if (BusinessSetting::where(['type' => 'business_process_step'])->first() == false) {
+            DB::table('business_settings')->updateOrInsert(["type" => "business_process_step"], [
+                "value" => json_encode(
+                    [
+                        [
+                            "title" => "Get Registered",
+                            "description" => "Sign up easily and create your seller account in just a few minutes. It fast and simple to get started.",
+                            "image" => "",
+                        ],
+                        [
+                            "title" => "Upload Products",
+                            "description" => "List your products with detailed descriptions and high-quality images to attract more buyers effortlessly.",
+                            "image" => "",
+                        ],
+                        [
+                            "title" => "Start Selling",
+                            "description" => "Go live and start reaching millions of potential buyers immediately. Watch your sales grow with our vast audience.",
+                            "image" => "",
+                        ]
+                    ]
+                ),
+            ]);
+        }
+
+        //registration data insert start
+        $vendorRegistrationReason = [
+            [
+                "title" => "Millions of Users",
+                "description" => "Access a vast audience with millions of active users ready to buy your products.",
+                "priority" => 1,
+                "status" => 1,
+            ],
+            [
+                "title" => "Free Marketing",
+                "description" => "Benefit from our extensive, no-cost marketing efforts to boost your visibility and sales.",
+                "priority" => 2,
+                "status" => 1,
+            ],
+            [
+                "title" => "SEO Friendly",
+                "description" => "Enjoy enhanced search visibility with our SEO-friendly platform, driving more traffic to your listings.",
+                "priority" => 3,
+                "status" => 1,
+            ],
+            [
+                "title" => "24/7 Support",
+                "description" => "Get round-the-clock support from our dedicated team to resolve any issues and assist you anytime.",
+                "priority" => 4,
+                "status" => 1,
+            ],
+            [
+                "title" => "Easy Onboarding",
+                "description" => "Start selling quickly with our user-friendly onboarding process designed to get you up and running fast.",
+                "priority" => 5,
+                "status" => 1,
+            ],
+        ];
+
+        if (VendorRegistrationReason::count()<1) {
+            foreach($vendorRegistrationReason as $reason){
+                DB::table('vendor_registration_reasons')->updateOrInsert(["title" => $reason['title']], [
+                    "description" => $reason['description'],
+                    "priority" => $reason['priority'],
+                    "status" => $reason['status'],
+                ]);
+            }
+        }
+        //registration data insert end
+
+
+        //faq for vendor registration start
+        $faqVendorRegistration = [
+            [
+                "type" => "vendor_registration",
+                "question" => "How do I register as a seller?",
+                "answer" => 'To register, click on the "Sign Up" button, fill in your details, and verify your account via email.',
+                'ranking' => 1,
+                'status' => 1,
+            ],
+            [
+                'type' => 'vendor_registration',
+                'question' => 'What are the fees for selling?',
+                'answer' => 'Our platform charges a small commission on each sale. There are no upfront listing fees.',
+                'ranking' => 2,
+                'status' => 1,
+            ],
+            [
+                'type' => 'vendor_registration',
+                'question' => 'How do I upload products?',
+                'answer' => 'Log in to your seller account, go to the "Upload Products" section, and fill in the product details and images.',
+                'ranking' => 3,
+                'status' => 1,
+            ],
+            [
+                'type' => 'vendor_registration',
+                'question' => 'How do I handle customer inquiries?',
+                'answer' => "You can manage customer inquiries directly through our platform's messaging system, ensuring quick and efficient communication.",
+                'ranking' => 4,
+                'status' => 1,
+            ],
+        ];
+
+        if(HelpTopic::where('type', 'vendor_registration')->count()<5){
+            foreach($faqVendorRegistration as $faq){
+                DB::table('help_topics')->insert([
+                    "type" => $faq['type'],
+                    "question" => $faq['question'],
+                    "answer" => $faq['answer'],
+                    "ranking" => $faq['ranking'],
+                    "status" => $faq['status'],
+                ]);
+            }
+        }
+        //faq for vendor registration start
+
+
+
+        Product::where(['product_type' => 'digital'])->update(['current_stock' => 999999999]);
+        $prioritySetupKeyArray = [
+            'brand_list_priority',
+            'category_list_priority',
+            'vendor_list_priority',
+            'flash_deal_priority',
+            'featured_product_priority',
+            'feature_deal_priority',
+            'new_arrival_product_list_priority',
+            'top_vendor_list_priority',
+            'category_wise_product_list_priority',
+            'top_rated_product_list_priority',
+            'best_selling_product_list_priority',
+            'searched_product_list_priority',
+            'vendor_product_list_priority'
+        ];
+        foreach ($prioritySetupKeyArray as $key=>$value){
+            if (BusinessSetting::where(['type' => $value])->first() == false) {
+                DB::table('business_settings')->updateOrInsert(['type' => $value],
+                    [
+                        'type' => $value,
+                        'value' => '',
+                        'created_at' => now(),
+                        'updated_at' => now(),
+
+                    ]
+                );
+            }
+        }
     }
 
     public static function notification_message_import()

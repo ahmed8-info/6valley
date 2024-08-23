@@ -80,10 +80,17 @@ trait  Processor
 
     public function payment_response($payment_info, $payment_flag): Application|JsonResponse|Redirector|RedirectResponse|\Illuminate\Contracts\Foundation\Application
     {
+        $getNewUser = (int)0;
+        $additionalData = json_decode($payment_info->additional_data, true);
+
+        if (isset($additionalData['new_customer_id']) && isset($additionalData['is_guest_in_order'])) {
+            $getNewUser = (int)(($additionalData['new_customer_id'] != 0 && $additionalData['is_guest_in_order'] != 1) ? 1 : 0);
+        }
+
         $token_string = 'payment_method=' . $payment_info->payment_method . '&&transaction_reference=' . $payment_info->transaction_id;
         if (in_array($payment_info->payment_platform, ['web', 'app']) && $payment_info['external_redirect_link'] != null) {
-            return redirect($payment_info['external_redirect_link'] . '?flag=' . $payment_flag . '&&token=' . base64_encode($token_string));
+            return redirect($payment_info['external_redirect_link'] . '?flag=' . $payment_flag . '&&token=' . base64_encode($token_string) . '&&new_user=' . $getNewUser);
         }
-        return redirect()->route('payment-' . $payment_flag, ['token' => base64_encode($token_string)]);
+        return redirect()->route('payment-' . $payment_flag, ['token' => base64_encode($token_string), 'new_user' => $getNewUser]);
     }
 }

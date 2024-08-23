@@ -11,9 +11,14 @@
                 href="{{route('admin.business-settings.payment-method.payment-option')}}">{{translate('payment_options')}}</a>
         </li>
         <li class="{{ Request::is('admin/product-settings') ?'active':'' }}"><a
-                href="{{ route('admin.product-settings.index') }}">{{translate('products')}}</a></li>
+                href="{{ route('admin.product-settings.index') }}">{{translate('products')}}</a>
+        </li>
+        <li class="text-capitalize {{ Request::is('admin/business-settings/priority-setup') ?'active':'' }}">
+            <a href="{{route('admin.business-settings.priority-setup.index')}}">{{translate('priority_setup')}}</a>
+        </li>
         <li class="{{ Request::is('admin/business-settings/order-settings/'.BusinessSettings::ORDER_VIEW[URI]) ?'active':'' }}">
-            <a href="{{route('admin.business-settings.order-settings.index')}}">{{translate('orders')}}</a></li>
+            <a href="{{route('admin.business-settings.order-settings.index')}}">{{translate('orders')}}</a>
+        </li>
         <li class="{{ Request::is('admin/business-settings/vendor-settings') ?'active':'' }}"><a
                 href="{{route('admin.business-settings.vendor-settings.index')}}">{{translate('vendors')}}</a></li>
         <li class="{{ Request::is('admin/customer/customer-settings') ?'active':'' }}"><a

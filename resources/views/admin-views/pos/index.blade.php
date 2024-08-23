@@ -124,17 +124,6 @@
 <button class="d-none" id="hold-orders-modal-btn" type="button" data-toggle="modal" data-target="#hold-orders-modal">
 </button>
 
-<div class="alert alert--message-3 alert--message-for-pos border-bottom alert-dismissible fade show d-none">
-    <img width="28" src="{{ dynamicAsset(path: 'public/assets/back-end/img/warning.png') }}" alt="">
-    <div class="w-0">
-        <h6>{{ translate('Warning').'!'}}</h6>
-        <span class="warning-message"></span>
-    </div>
-    <button type="button" class="close position-relative p-0 close-alert--message-for-pos">
-        <span aria-hidden="true">&times;</span>
-    </button>
-</div>
-
 @if($order)
 @include('admin-views.pos.partials.modals._print-invoice')
 @endif

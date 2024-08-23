@@ -3,12 +3,14 @@
 namespace App\Listeners;
 
 use App\Events\EmailVerificationEvent;
+use App\Traits\EmailTemplateTrait;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Support\Facades\Mail;
 
 class EmailVerificationListener
 {
+    use EmailTemplateTrait;
     /**
      * Create the event listener.
      */
@@ -26,12 +28,8 @@ class EmailVerificationListener
     }
 
     private function sendMail(EmailVerificationEvent $event):void{
-        $token = $event->token;
         $email = $event->email;
-        try{
-            Mail::to($email)->send(new \App\Mail\EmailVerification($token));
-        }catch(\Exception $exception) {
-            info($exception);
-        }
+        $data = $event->data;
+        $this->sendingMail(sendMailTo: $email,userType: $data['userType'],templateName: $data['templateName'],data: $data);
     }
 }

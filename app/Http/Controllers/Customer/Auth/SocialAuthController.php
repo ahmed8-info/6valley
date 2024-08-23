@@ -6,7 +6,7 @@ use App\Utils\Helpers;
 use App\Http\Controllers\Controller;
 use App\Models\BusinessSetting;
 use App\Models\Wishlist;
-use App\User;
+use App\Models\User;
 use App\Utils\CartManager;
 use Brian2694\Toastr\Facades\Toastr;
 use Illuminate\Http\Request;
@@ -105,6 +105,7 @@ class SocialAuthController extends Controller
                 return $q;
             })->where('customer_id', $user->id)->pluck('product_id')->toArray();
 
+            session()->forget('wish_list');
             session()->put('wish_list', $wish_list);
             $message = translate('welcome_to').' ' . $company_name->value . '!';
             CartManager::cart_to_db();

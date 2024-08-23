@@ -13,5 +13,9 @@ enum Withdraw
         URI => 'close',
         VIEW => ''
     ];
-
+    const EXPORT = [
+        URI => 'export',
+        VIEW => '',
+         FILE_NAME => 'Vendor-Withdraw-Request.xlsx'
+    ];
 }

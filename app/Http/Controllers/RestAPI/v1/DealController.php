@@ -7,33 +7,37 @@ use App\Models\FlashDeal;
 use App\Models\FlashDealProduct;
 use App\Models\Product;
 use App\Utils\Helpers;
+use App\Utils\ProductManager;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class DealController extends Controller
 {
-    public function get_featured_deal(Request $request)
+    public function getFeaturedDealProducts(Request $request): JsonResponse
     {
         $user = Helpers::get_customer($request);
-        $featured_deal = FlashDeal::where(['status' => 1])
-            ->where(['deal_type' => 'feature_deal'])->first();
+        $featuredDeal = FlashDeal::where(['deal_type' => 'feature_deal', 'status' => 1])
+                        ->whereDate('start_date', '<=', date('Y-m-d'))
+                        ->whereDate('end_date', '>=', date('Y-m-d'))
+                        ->first();
 
-        $p_ids = array();
-        if ($featured_deal) {
-            $p_ids = FlashDealProduct::with(['product'])
-                ->whereHas('product', function ($q) {
-                    $q->active();
+        $productIDs = [];
+        if ($featuredDeal) {
+            $productIDs = FlashDealProduct::with(['product'])
+                ->whereHas('product', function ($query) {
+                    $query->active();
                 })
-                ->where(['flash_deal_id' => $featured_deal->id])
+                ->where(['flash_deal_id' => $featuredDeal->id])
                 ->pluck('product_id')->toArray();
         }
 
-        $products = Product::with(['rating','tags'])
-            ->withCount(['reviews','wishList' => function($query) use($user){
+        $products = Product::with(['rating', 'tags'])
+            ->withCount(['reviews', 'wishList' => function ($query) use ($user) {
                 $query->where('customer_id', $user != 'offline' ? $user->id : '0');
             }])
-            ->whereIn('id', $p_ids)
-            ->get();
+            ->whereIn('id', $productIDs);
 
+        $products = ProductManager::getPriorityWiseFeatureDealQuery(query: $products, dataLimit: 'all');
         return response()->json(Helpers::product_data_formatting($products, true), 200);
     }
 

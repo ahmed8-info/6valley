@@ -5,7 +5,7 @@ namespace App\Http\Controllers\RestAPI\v1\auth;
 use App\Events\EmailVerificationEvent;
 use App\Http\Controllers\Controller;
 use App\Models\PhoneOrEmailVerification;
-use App\User;
+use App\Models\User;
 use App\Utils\Helpers;
 use Carbon\Carbon;
 use Carbon\CarbonInterval;
@@ -25,8 +25,8 @@ class EmailVerificationController extends Controller
         if ($validator->fails()) {
             return response()->json(['errors' => Helpers::error_processor($validator)], 403);
         }
-
-        if(User::where('email', $request->email)->first()->temporary_token != $request->temporary_token) {
+        $user = User::where('email', $request->email)->first();
+        if($user->temporary_token != $request->temporary_token) {
             return response()->json([
                 'message' => translate('temporary_token_mismatch'),
             ], 200);
@@ -47,7 +47,17 @@ class EmailVerificationController extends Controller
         }
         if ($emailServices_smtp['status'] == 1) {
             try{
-                EmailVerificationEvent::dispatch($request['email'], $token);
+
+                $data = [
+                    'userName' => $user['f_name'],
+                    'subject' => translate('registration_Verification_Code'),
+                    'title' => translate('registration_Verification_Code'),
+                    'verificationCode' => $token,
+                    'userType'=>'customer' ,
+                    'templateName'=> 'registration-verification',
+                ];
+
+                event(new EmailVerificationEvent(email: $user['email'],data: $data));
                 $response = translate('check_your_email');
                 $otp_resend_time = Helpers::get_business_settings('otp_resend_time') > 0 ? Helpers::get_business_settings('otp_resend_time') : 0;
             } catch (\Exception $exception) {
@@ -113,7 +123,16 @@ class EmailVerificationController extends Controller
             }
             if ($emailServices_smtp['status'] == 1) {
                 try{
-                    EmailVerificationEvent::dispatch($request['email'], $generate_new_token);
+                    $data = [
+                        'userName' => $user['f_name'],
+                        'subject' => translate('registration_Verification_Code'),
+                        'title' => translate('registration_Verification_Code'),
+                        'verificationCode' => $token,
+                        'userType'=>'customer' ,
+                        'templateName'=> 'registration-verification',
+                    ];
+
+                    event(new EmailVerificationEvent(email: $user['email'],data: $data));
                     $response = translate('check_your_email');
                     $otp_resend_time = Helpers::get_business_settings('otp_resend_time') > 0 ? Helpers::get_business_settings('otp_resend_time') : 0;
                 } catch (\Exception $exception) {

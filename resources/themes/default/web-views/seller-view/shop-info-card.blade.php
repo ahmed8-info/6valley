@@ -7,31 +7,31 @@
                         <div class="position-relative overflow-hidden d-flex align-items-center aspect-1 rounded w-90px">
                             @if($seller_temporary_close || $inhouse_temporary_close)
                                 <span class="temporary-closed-details p-1">
-                                                    <span>{{translate('closed_now')}}</span>
-                                                </span>
+                                    <span>{{translate('Temporary_OFF')}}</span>
+                                </span>
                             @elseif(($seller_id==0 && $inHouseVacationStatus && $current_date >= $inhouse_vacation_start_date && $current_date <= $inhouse_vacation_end_date) ||
                             $seller_id!=0 && $seller_vacation_status && $current_date >= $seller_vacation_start_date && $current_date <= $seller_vacation_end_date)
                                 <span class="temporary-closed-details p-1">
-                                                    <span>{{translate('closed_now')}}</span>
-                                                </span>
+                                    <span>{{translate('closed_now')}}</span>
+                                </span>
                             @endif
                             <img class="img-fluid" alt=""
-                                 src="{{ getValidImage(path: 'storage/app/public/shop/'.$shop->image, type: 'shop') }}">
+                                 src="{{ getStorageImages(path: $shop->image_full_url, type: 'shop') }}">
                         </div>
                     @else
                         <div class="position-relative overflow-hidden d-flex align-items-center aspect-1 rounded w-90px">
                             @if($seller_temporary_close || $inhouse_temporary_close)
                                 <span class="temporary-closed-details">
-                                                    <span>{{translate('closed_now')}}</span>
-                                                </span>
+                                    <span>{{translate('Temporary_OFF')}}</span>
+                                </span>
                             @elseif(($seller_id==0 && $inHouseVacationStatus && $current_date >= $inhouse_vacation_start_date && $current_date <= $inhouse_vacation_end_date) ||
                             $seller_id!=0 && $seller_vacation_status && $current_date >= $seller_vacation_start_date && $current_date <= $seller_vacation_end_date)
                                 <span class="temporary-closed-details">
-                                                    <span>{{translate('closed_now')}}</span>
-                                                </span>
+                                    <span>{{translate('closed_now')}}</span>
+                                </span>
                             @endif
                             <img class="img-fluid" alt=""
-                                 src="{{ getValidImage(path: 'storage/app/public/company/'.$web_config['fav_icon']->value, type: 'shop') }}">
+                                 src="{{ getStorageImages(path: $web_config['fav_icon'], type: 'shop') }}">
                         </div>
                     @endif
                 </div>

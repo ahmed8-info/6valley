@@ -18,7 +18,7 @@ class AddFundToWalletEvent
      *
      * @return void
      */
-    public function __construct(public readonly string $email, public object|array $walletTransaction)
+    public function __construct(public readonly string $email, public object|array $data)
     {
     }
 

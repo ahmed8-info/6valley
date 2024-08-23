@@ -24,7 +24,7 @@
                             </a>
                         </div>
                         <div class="auto-col mobile-items-2 gap-2 gap-sm-3 recommended-product-grid minWidth-12rem">
-                            @foreach($featured_products as $product)
+                            @foreach($featuredProductsList as $product)
                                 @if($product)
                                     @include('theme-views.partials._product-large-card',['product'=>$product])
                                 @endif
@@ -38,10 +38,8 @@
                             </a>
                         </div>
                         <div class="auto-col mobile-items-2 gap-2 gap-sm-3 recommended-product-grid minWidth-12rem">
-                            @foreach($bestSellProduct as $order)
-                                @if($order->product)
-                                    @include('theme-views.partials._product-large-card',['product'=>$order->product])
-                                @endif
+                            @foreach($bestSellProduct as $singleProduct)
+                                @include('theme-views.partials._product-large-card',['product'=>$singleProduct])
                             @endforeach
                         </div>
                     </div>

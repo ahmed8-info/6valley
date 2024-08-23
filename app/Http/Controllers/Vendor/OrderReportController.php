@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers\Vendor;
 
+use App\Contracts\Repositories\VendorRepositoryInterface;
+use App\Enums\ExportFileNames\Admin\Report;
+use App\Exports\OrderReportExport;
 use App\Models\Seller;
 use App\Utils\BackEndHelper;
 use App\Utils\Helpers;
@@ -12,10 +15,17 @@ use Carbon\CarbonPeriod;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\View;
+use Maatwebsite\Excel\Facades\Excel;
 use Rap2hpoutre\FastExcel\FastExcel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class OrderReportController extends Controller
 {
+    public function __construct(
+        private readonly VendorRepositoryInterface $vendorRepo,
+    )
+    {
+    }
     public function order_report(Request $request)
     {
         $date_type = $request['date_type'] ?? 'this_year';
@@ -314,6 +324,21 @@ class OrderReportController extends Controller
         }
 
         return (new FastExcel($data))->download('order_report_list.xlsx');
+    }
+    public function orderReportExportExcel(Request $request):BinaryFileResponse
+    {
+        $orders = self::all_order_table_data_filter($request)->latest('updated_at')->get();
+        $vendorId = auth('seller')->id();
+        $vendor = $this->vendorRepo->getFirstWhere(params:['id' => $vendorId]);
+        $data = [
+            'orders' =>$orders,
+            'search' =>$request['search'],
+            'vendor' => $vendor,
+            'from' => $request['from'],
+            'to' => $request['to'],
+            'dateType' => $request['date_type'] ?? 'this_year'
+        ];
+        return Excel::download(new OrderReportExport($data),Report::ORDER_REPORT_LIST);
     }
 
     public function order_report_chart_common_query($start_date, $end_date)

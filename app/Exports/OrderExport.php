@@ -105,6 +105,14 @@ class OrderExport implements FromView, ShouldAutoSize, WithStyles,WithColumnWidt
                         $this->data['orders']->each(function($item,$index) use($event) {
                             $index+=5;
                             $event->sheet->mergeCells("O$index:P$index");
+
+                        });
+                    }
+                    if(isset($this->data['data-from']) && $this->data['data-from'] == 'vendor'){
+                        $event->sheet->mergeCells('O4:P4');
+                        $this->data['orders']->each(function($item,$index) use($event) {
+                            $index+=5;
+                            $event->sheet->mergeCells("O$index:P$index");
                         });
                     }
                     $event->sheet->getRowDimension(2)->setRowHeight(110);

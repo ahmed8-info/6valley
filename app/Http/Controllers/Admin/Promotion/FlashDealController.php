@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin\Promotion;
 
+use App\Contracts\Repositories\BusinessSettingRepositoryInterface;
 use App\Contracts\Repositories\FlashDealProductRepositoryInterface;
 use App\Contracts\Repositories\FlashDealRepositoryInterface;
 use App\Contracts\Repositories\ProductRepositoryInterface;
@@ -33,6 +34,7 @@ class FlashDealController extends BaseController
         private readonly FlashDealProductRepositoryInterface $flashDealProductRepo,
         private readonly FlashDealRepositoryInterface        $flashDealRepo,
         private readonly TranslationRepositoryInterface      $translationRepo,
+        private readonly BusinessSettingRepositoryInterface $businessSettingRepo,
     ){}
 
     public function index(?Request $request, string $type = null): View|Collection|LengthAwarePaginator|null|callable|RedirectResponse
@@ -49,7 +51,8 @@ class FlashDealController extends BaseController
             withCount: ['products'=>'products'],
             dataLimit: getWebConfig('pagination_limit')
         );
-        return view(FlashDeal::LIST[VIEW], compact('flashDeals'));
+        $flashDealPriority = json_decode($this->businessSettingRepo->getFirstWhere(params: ['type' => 'flash_deal_priority'])['value']);
+        return view(FlashDeal::LIST[VIEW], compact('flashDeals','flashDealPriority'));
     }
 
     public function add(FlashDealAddRequest $request, FlashDealService $flashDealService): RedirectResponse
@@ -109,15 +112,14 @@ class FlashDealController extends BaseController
 
     public function addProduct(ProductIDRequest $request, $deal_id, FlashDealService $flashDealService): RedirectResponse
     {
-        $flashDealProducts = $this->flashDealProductRepo->getFirstWhere(params: ['flash_deal_id'=>$deal_id, 'product_id'=>$request['product_id']]);
-        if(!isset($flashDealProducts)) {
-            $dataArray = $flashDealService->getAddProduct(request: $request, id:$deal_id);
-            $this->flashDealProductRepo->add(data: $dataArray);
-            Toastr::success(translate('product_added_successfully'));
-            return back();
+        foreach ($request['product_id'] as $key=>$productId) {
+            $flashDealProducts = $this->flashDealProductRepo->getFirstWhere(params: ['flash_deal_id'=>$deal_id, 'product_id'=>$productId]);
+            if (!$flashDealProducts){
+                $dataArray = $flashDealService->getAddProduct(request: $request,productId:$productId, id:$deal_id);
+                $this->flashDealProductRepo->add(data: $dataArray);
+            }
         }
-
-        Toastr::info(translate('product_already_added'));
+        Toastr::success(translate('product_added_successfully'));
         return back();
     }
 

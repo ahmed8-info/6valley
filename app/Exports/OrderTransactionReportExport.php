@@ -87,7 +87,13 @@ class OrderTransactionReportExport implements FromView, ShouldAutoSize, WithStyl
                 ->getAlignment()
                     ->setHorizontal(Alignment::HORIZONTAL_LEFT)
                     ->setVertical(Alignment::VERTICAL_CENTER);
-
+                if(isset($this->data['data-from']) && $this->data['data-from'] == 'vendor'){
+                    $event->sheet->mergeCells('R3:T3');
+                    $this->data['transactions']->each(function($item,$index) use($event) {
+                        $index+=4;
+                        $event->sheet->mergeCells("R$index:T$index");
+                    });
+                }
                 $event->sheet->mergeCells('A1:T1');
                 $event->sheet->mergeCells('A2:B2');
                 $event->sheet->mergeCells('C2:T2');

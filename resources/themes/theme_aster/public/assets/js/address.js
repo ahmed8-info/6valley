@@ -1,27 +1,30 @@
 "use strict";
 $(document).ready(function () {
     $('.select-picker').select2();
-    initAutoComplete();
     $(document).on("keydown", "input", function (e) {
         if (e.which === 13) {
             e.preventDefault();
         }
     });
 });
-function initAutoComplete() {
+async function initAutoComplete() {
+    let latitude = $('#address-latitude').data('latitude')
+    let longitude = $('#address-longitude').data('longitude')
     let myLatLng = {
-        lat: $('#address-latitude').data('latitude'),
-        lng: $('#address-longitude').data('longitude'),
+        lat: latitude,
+        lng: longitude,
     };
+    const { Map } = await google.maps.importLibrary("maps");
+    const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
     const map = new google.maps.Map(document.getElementById("location_map_canvas"), {
         center: myLatLng,
         zoom: 13,
-        mapTypeId: "roadmap",
+        mapId: 'roadmap'
     });
 
-    let marker = new google.maps.Marker({
+    let marker = new AdvancedMarkerElement({
+        map,
         position: myLatLng,
-        map: map,
     });
 
     marker.setMap(map);
@@ -30,7 +33,7 @@ function initAutoComplete() {
         var coordinate = JSON.stringify(mapsMouseEvent.latLng.toJSON(), null, 2);
         var coordinates = JSON.parse(coordinate);
         var latlng = new google.maps.LatLng(coordinates['lat'], coordinates['lng']);
-        marker.setPosition(latlng);
+        marker.position={lat:coordinates['lat'], lng:coordinates['lng']};
         map.panTo(latlng);
 
         document.getElementById('latitude').value = coordinates['lat'];
@@ -70,7 +73,7 @@ function initAutoComplete() {
             if (!place.geometry || !place.geometry.location) {
                 return;
             }
-            var mrkr = new google.maps.Marker({
+            var mrkr = new AdvancedMarkerElement({
                 map,
                 title: place.name,
                 position: place.geometry.location,
@@ -92,6 +95,9 @@ function initAutoComplete() {
         });
         map.fitBounds(bounds);
     });
+}
+function callBackFunction(){
+    initAutoComplete();
 }
 $(document).on("keydown", "input", function (e) {
     if (e.which === 13) e.preventDefault();

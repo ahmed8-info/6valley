@@ -70,6 +70,8 @@ class UpdateController extends Controller
         $this->insert_data_of('14.3.1');
         $this->insert_data_of('14.4');
         $this->insert_data_of('14.5');
+        $this->insert_data_of('14.6');
+        $this->insert_data_of('14.7');
 
         return redirect(env('APP_URL'));
     }

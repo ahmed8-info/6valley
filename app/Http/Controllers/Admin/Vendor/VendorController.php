@@ -16,7 +16,7 @@ use App\Contracts\Repositories\WithdrawRequestRepositoryInterface;
 use App\Enums\ExportFileNames\Admin\Vendor as VendorExport;
 use App\Enums\ViewPaths\Admin\Vendor;
 use App\Enums\WebConfigKey;
-use App\Events\VendorRegistrationMailEvent;
+use App\Events\VendorRegistrationEvent;
 use App\Events\WithdrawStatusUpdateEvent;
 use App\Exports\VendorListExport;
 use App\Exports\VendorWithdrawRequest;
@@ -26,6 +26,7 @@ use App\Http\Requests\Admin\VendorAddRequest;
 use App\Services\ShopService;
 use App\Services\VendorService;
 use App\Traits\CommonTrait;
+use App\Traits\EmailTemplateTrait;
 use App\Traits\PaginatorTrait;
 use App\Traits\PushNotificationTrait;
 use Brian2694\Toastr\Facades\Toastr;
@@ -42,6 +43,7 @@ class VendorController extends BaseController
     use PaginatorTrait;
     use CommonTrait;
     use PushNotificationTrait;
+    use EmailTemplateTrait;
 
     public function __construct(
         private readonly VendorRepositoryInterface $vendorRepo,
@@ -94,13 +96,14 @@ class VendorController extends BaseController
         $this->shopRepo->add($this->shopService->getAddShopDataForRegistration(request:$request,vendorId: $vendor['id']));
         $this->vendorWalletRepo->add($this->vendorService->getInitialWalletData(vendorId:$vendor['id']));
         $data = [
-            'name' => $request['f_name'],
+            'vendorName' => $request['f_name'],
             'status' => 'pending',
             'subject' => translate('Vendor_Registration_Successfully_Completed'),
-            'title' => translate('Registration_Complete').'!',
-            'message' => translate('congratulation').'!'.translate('Your_registration_request_has_been_send_to_admin_successfully').'!'.translate('Please_wait_until_admin_reviewal').'.',
+            'title' => translate('Vendor_Registration_Successfully_Completed'),
+            'userType' => 'vendor',
+            'templateName' => 'registration',
         ];
-        event(new VendorRegistrationMailEvent($request['email'],$data));
+        event(new VendorRegistrationEvent(email: $request['email'],data: $data));
         return response()->json(['message'=>translate('vendor_added_successfully')]);
     }
 
@@ -119,41 +122,45 @@ class VendorController extends BaseController
         if ($vendor['status'] == 'pending'){
             if ($request['status'] == "approved"){
                 $data = [
-                    'name' => $vendor['f_name'],
+                    'vendorName' => $vendor['f_name'],
                     'status' => 'approved',
                     'subject' => translate('Vendor_Registration_Approved'),
-                    'title' => translate('registration_Approved').'!',
-                    'message' => translate('your_registration_request_has_been_approved_by_admin').'.'.translate('now_you_can_complete_your_store_setting_and_start_selling_your_product_on').getWebConfig('company_name').'.',
+                    'title' => translate('Vendor_Registration_Approved'),
+                    'userType' => 'vendor',
+                    'templateName' => 'registration-approved',
                 ];
             }elseif ($request['status'] == "rejected"){
                 $data = [
-                    'name' => $vendor['f_name'],
+                    'vendorName' => $vendor['f_name'],
                     'status' => 'denied',
                     'subject' => translate('Vendor_Registration_Denied'),
-                    'title' => translate('registration_Denied').'!',
-                    'message' => translate('your_registration_request_has_been_denied_by_admin').'.'.translate('please_contact_with_admin_or_support_center_if_you_have_any_queries').'.',
+                    'title' => translate('Vendor_Registration_Denied'),
+                    'userType' => 'vendor',
+                    'templateName' => 'registration-denied',
                 ];
             }
         }else{
             if ($request['status'] == "suspended"){
                 $data = [
-                    'name' => $vendor['f_name'],
+                    'vendorName' => $vendor['f_name'],
                     'status' => 'suspended',
                     'subject' => translate('Account_Suspended'),
-                    'title' => translate('Your_Account_Has_Been_Suspended').'!',
-                    'message' => translate('your_account_access_has_been_suspended_by_admin').'.'.translate('from_now_you_can_access_your_app_and_panel_again').' '.translate('please_contact_us_for_any_queries,_we’re_always_happy_to_help').'.',
+                    'title' => translate('Account_Suspended'),
+                    'userType' => 'vendor',
+                    'templateName' => 'account-suspended',
                 ];
             }else{
                 $data = [
-                    'name' => $vendor['f_name'],
+                    'vendorName' => $vendor['f_name'],
                     'status' => 'approved',
                     'subject' => translate('Account_Activate'),
-                    'title' => translate('you’ve_got_access_to_your_account_again').'!',
-                    'message' => translate('your_account_suspension_has_been_revoked_by_admin').'.'.translate('from_now_you_can_access_your_app_and_panel_again').' '.translate('please_contact_us_for_any_queries,_we’re_always_happy_to_help').'.',
+                    'title' => translate('Account_Activate'),
+                    'userType' => 'vendor',
+                    'templateName' => 'account-activation',
                 ];
             }
         }
-        event(new VendorRegistrationMailEvent($vendor['email'],$data));
+        event(new VendorRegistrationEvent(email:$vendor['email'],data: $data));
         return back();
     }
 
@@ -523,12 +530,13 @@ class VendorController extends BaseController
         $denied = $withdrawRequests->where('approved', 2)->count();
 
         return Excel::download(new VendorWithdrawRequest([
-                    'withdraw_request'=>$withdrawRequests,
-                    'filter' => session('withdraw_status_filter'),
-                    'pending'=> $pending,
-                    'approved'=> $approved,
-                    'denied'=> $denied,
-                ]), 'Seller-Withdraw-Request.xlsx'
+                'data-from' =>'admin',
+                'withdraw_request'=>$withdrawRequests,
+                'filter' => session('withdraw_status_filter'),
+                'pending'=> $pending,
+                'approved'=> $approved,
+                'denied'=> $denied,
+                ]), 'Vendor-Withdraw-Request.xlsx'
         );
     }
 

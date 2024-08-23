@@ -223,7 +223,7 @@
                             {{translate('download_PDF')}}
                         </a>
                     </div>
-                    <div>
+                    <div class="dropdown">
                         <button type="button" class="btn btn-outline--primary text-nowrap btn-block"
                                 data-toggle="dropdown">
                             <i class="tio-download-to"></i>
@@ -304,10 +304,10 @@
                                         {{translate('not_found')}}
                                     @endif
                                 </td>
-                                <td>{{setCurrencySymbol(amount: usdToDefaultCurrency(amount: $transaction->orderDetails[0]->order_details_sum_price), currencyCode: getCurrencyCode()) }}</td>
-                                <td>{{setCurrencySymbol(amount: usdToDefaultCurrency(amount: $transaction->orderDetails[0]->order_details_sum_discount), currencyCode: getCurrencyCode()) }}</td>
-                                <td>{{setCurrencySymbol(amount: usdToDefaultCurrency(amount: $transaction->order->discount_amount), currencyCode: getCurrencyCode()) }}</td>
-                                <td>{{setCurrencySymbol(amount: usdToDefaultCurrency(amount: $transaction->orderDetails[0]->order_details_sum_price - $transaction->orderDetails[0]->order_details_sum_discount - (isset($transaction->order->coupon) && $transaction->order->coupon->coupon_type != 'free_delivery'?$transaction->order->discount_amount:0)), currencyCode: getCurrencyCode()) }}</td>
+                                <td>{{setCurrencySymbol(amount: usdToDefaultCurrency(amount: $transaction->orderDetails[0]?->order_details_sum_price??0), currencyCode: getCurrencyCode()) }}</td>
+                                <td>{{setCurrencySymbol(amount: usdToDefaultCurrency(amount: $transaction->orderDetails[0]?->order_details_sum_discount??0), currencyCode: getCurrencyCode()) }}</td>
+                                <td>{{setCurrencySymbol(amount: usdToDefaultCurrency(amount: $transaction?->order?->discount_amount??0), currencyCode: getCurrencyCode()) }}</td>
+                                <td>{{setCurrencySymbol(amount: usdToDefaultCurrency(amount: ($transaction?->orderDetails[0]?->order_details_sum_price??0) - ($transaction?->orderDetails[0]?->order_details_sum_discount??0) - (isset($transaction->order->coupon) && $transaction->order->coupon->coupon_type != 'free_delivery'? $transaction->order->discount_amount:0)), currencyCode: getCurrencyCode()) }}</td>
                                 <td>{{setCurrencySymbol(amount: usdToDefaultCurrency(amount: $transaction['tax']), currencyCode: getCurrencyCode()) }}</td>
                                 <td>{{setCurrencySymbol(amount: usdToDefaultCurrency(amount: $transaction->order->shipping_cost), currencyCode: getCurrencyCode()) }}</td>
                                 <td>{{setCurrencySymbol(amount: usdToDefaultCurrency(amount: $transaction->order->order_amount), currencyCode: getCurrencyCode()) }}</td>

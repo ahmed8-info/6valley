@@ -7,10 +7,14 @@ use App\Contracts\Repositories\OrderDetailRepositoryInterface;
 use App\Contracts\Repositories\OrderRepositoryInterface;
 use App\Contracts\Repositories\RefundRequestRepositoryInterface;
 use App\Contracts\Repositories\RefundStatusRepositoryInterface;
+use App\Contracts\Repositories\VendorRepositoryInterface;
+use App\Enums\ExportFileNames\Admin\RefundRequest as RefundRequestExportFile;
 use App\Enums\ViewPaths\Vendor\Refund;
 use App\Events\RefundEvent;
+use App\Exports\RefundRequestExport;
 use App\Http\Controllers\BaseController;
 use App\Http\Requests\Vendor\RefundStatusRequest;
+use App\Repositories\VendorRepository;
 use App\Services\RefundStatusService;
 use App\Traits\CustomerTrait;
 use Brian2694\Toastr\Facades\Toastr;
@@ -20,6 +24,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class RefundController extends BaseController
 {
@@ -31,6 +37,7 @@ class RefundController extends BaseController
         private readonly RefundStatusRepositoryInterface $refundStatusRepo,
         private readonly RefundStatusService $refundStatusService,
         private readonly OrderRepositoryInterface $orderRepo,
+        private readonly VendorRepositoryInterface $vendorRepo,
 
     )
     {
@@ -159,5 +166,27 @@ class RefundController extends BaseController
         }else {
             return response()->json(['message'=>translate('refunded_status_can_not_be_changed') . '!!']);
         }
+    }
+    public function exportList(Request $request, $status): BinaryFileResponse
+    {
+        $vendorId = auth('seller')->id();
+        $vendor = $this->vendorRepo->getFirstWhere(params:['id' => $vendorId]);
+        $refundList = $this->refundRequestRepo->getListWhereHas(
+            orderBy: ['id' => 'desc'],
+            searchValue: $request['search'],
+            filters: ['status' => $status],
+            whereHas: 'order',
+            whereHasFilters: [ 'seller_is'=>'seller', 'seller_id' => $vendorId],
+            relations: ['order', 'order.seller', 'order.deliveryMan', 'product'],
+            dataLimit: 'all',
+        );
+        return Excel::download(new RefundRequestExport([
+            'data-from' => 'vendor',
+            'vendor' => $vendor,
+            'refundList' => $refundList,
+            'search' => $request['search'],
+            'status' => $status,
+            'filter_By' => $request->get('type', 'all'),
+        ]), RefundRequestExportFile::EXPORT_XLSX);
     }
 }

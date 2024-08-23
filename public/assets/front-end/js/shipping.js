@@ -86,22 +86,23 @@ $('.add-another-address').on('click', function (){
 
 let defaultLatitudeAddressValue = $('#default-latitude-address').data('value');
 let defaultLongitudeAddressValue = $('#default-longitude-address').data('value');
-function initAutocomplete() {
+async function initAutocomplete() {
     var myLatLng = {
         lat: defaultLatitudeAddressValue,
         lng: defaultLongitudeAddressValue
     };
-
+    const { Map } = await google.maps.importLibrary("maps");
+    const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
     const map = new google.maps.Map(document.getElementById("location_map_canvas"), {
         center: {
             lat: defaultLatitudeAddressValue,
             lng: defaultLongitudeAddressValue
         },
         zoom: 13,
-        mapTypeId: "roadmap",
+        mapId: "roadmap",
     });
 
-    var marker = new google.maps.Marker({
+    var marker = new AdvancedMarkerElement({
         position: myLatLng,
         map: map,
     });
@@ -112,7 +113,7 @@ function initAutocomplete() {
         var coordinates = JSON.stringify(mapsMouseEvent.latLng.toJSON(), null, 2);
         coordinates = JSON.parse(coordinates);
         var latlng = new google.maps.LatLng(coordinates['lat'], coordinates['lng']);
-        marker.setPosition(latlng);
+        marker.position={lat:coordinates['lat'], lng:coordinates['lng']};
         map.panTo(latlng);
 
         document.getElementById('latitude').value = coordinates['lat'];
@@ -159,7 +160,7 @@ function initAutocomplete() {
                 console.log("Returned place contains no geometry");
                 return;
             }
-            var mrkr = new google.maps.Marker({
+            var mrkr = new AdvancedMarkerElement({
                 map,
                 title: place.name,
                 position: place.geometry.location,
@@ -188,24 +189,25 @@ $(document).on("keydown", "input", function (e) {
     if (e.which == 13) e.preventDefault();
 })
 
-function initAutocompleteBilling() {
+async function initAutocompleteBilling() {
     var myLatLng = {
         lat: defaultLatitudeAddressValue,
         lng: defaultLongitudeAddressValue
     };
-
+    const { Map } = await google.maps.importLibrary("maps");
+    const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
     const map = new google.maps.Map(document.getElementById("location_map_canvas_billing"), {
         center: {
             lat: defaultLatitudeAddressValue,
             lng: defaultLongitudeAddressValue
         },
         zoom: 13,
-        mapTypeId: "roadmap",
+        mapId: "roadmap",
     });
 
-    var marker = new google.maps.Marker({
+    var marker = new AdvancedMarkerElement({
+        map,
         position: myLatLng,
-        map: map,
     });
 
     marker.setMap(map);
@@ -214,7 +216,7 @@ function initAutocompleteBilling() {
         var coordinates = JSON.stringify(mapsMouseEvent.latLng.toJSON(), null, 2);
         coordinates = JSON.parse(coordinates);
         var latlng = new google.maps.LatLng(coordinates['lat'], coordinates['lng']);
-        marker.setPosition(latlng);
+        marker.position={lat:coordinates['lat'], lng:coordinates['lng']};
         map.panTo(latlng);
 
         document.getElementById('billing_latitude').value = coordinates['lat'];
@@ -263,7 +265,7 @@ function initAutocompleteBilling() {
                 console.log("Returned place contains no geometry");
                 return;
             }
-            var mrkr = new google.maps.Marker({
+            var mrkr = new AdvancedMarkerElement({
                 map,
                 title: place.name,
                 position: place.geometry.location,
@@ -334,6 +336,10 @@ function checkoutFromShipping() {
         billing_address_same_shipping = false;
     }
 
+    let isCheckCreateAccount = $('#is_check_create_account');
+    let customerPassword = $('#customer_password');
+    let customerConfirmPassword = $('#customer_confirm_password');
+
     $.ajaxSetup({
         headers: {
             'X-CSRF-TOKEN': $('meta[name="_token"]').attr('content')
@@ -345,13 +351,18 @@ function checkoutFromShipping() {
             physical_product: physical_product,
             shipping: physical_product === 'yes' ? $('#address-form').serialize() : null,
             billing: $('#billing-address-form').serialize(),
-            billing_addresss_same_shipping: billing_address_same_shipping
+            billing_addresss_same_shipping: billing_address_same_shipping,
+            is_check_create_account: isCheckCreateAccount && isCheckCreateAccount.prop("checked") ? 1 : 0,
+            customer_password: customerPassword ? customerPassword.val() : null,
+            customer_confirm_password: customerConfirmPassword ? customerConfirmPassword.val() : null,
         },
 
         beforeSend: function () {
             $('#loading').show();
         },
         success: function (data) {
+            // console.log(errors)
+            // console.log(data.errors)
             if (data.errors) {
                 for (var i = 0; i < data.errors.length; i++) {
                     toastr.error(data.errors[i].message, {
@@ -367,11 +378,21 @@ function checkoutFromShipping() {
             $('#loading').hide();
         },
         error: function (data) {
-            let error_msg = data.responseJSON.errors;
-            toastr.error(error_msg, {
-                CloseButton: true,
-                ProgressBar: true
-            });
+            if (data.errors) {
+                for (var i = 0; i < data.errors.length; i++) {
+                    toastr.error(data.errors[i].message, {
+                        CloseButton: true,
+                        ProgressBar: true
+                    });
+                }
+            } else {
+                let error_msg = data.responseJSON.errors;
+                console.log(data.responseJSON)
+                toastr.error(error_msg, {
+                    CloseButton: true,
+                    ProgressBar: true
+                });
+            }
         }
     });
 }

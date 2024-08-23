@@ -37,6 +37,7 @@
                                             value="all" {{ $customer_id == 'all' ? 'selected' : '' }}>
                                         {{translate('all_customer')}}
                                     </option>
+
                                     @foreach($customers as $customer)
                                         <option class="text-left text-capitalize"
                                                 value="{{ $customer->id }}" {{ $customer->id == $customer_id ? 'selected' : '' }}>
@@ -180,7 +181,7 @@
                             {{translate('download_PDF')}}
                         </a>
                     </div>
-                    <div>
+                    <div class="dropdown">
                         <button type="button" class="btn btn-outline--primary text-nowrap btn-block"
                                 data-toggle="dropdown">
                             <i class="tio-download-to"></i>
@@ -190,7 +191,10 @@
                         <ul class="dropdown-menu dropdown-menu-right">
                             <li>
                                 <a class="dropdown-item"
-                                   href="{{ route('vendor.transaction.order-transaction-export-excel', ['date_type'=>request('date_type'), 'customer_id'=>request('customer_id'), 'search'=>request('search'), 'status'=>request('status'), 'from'=>request('from'), 'to'=>request('to')]) }}">{{translate('excel')}}</a>
+                                   href="{{ route('vendor.transaction.order-transaction-export-excel', ['date_type'=>request('date_type'), 'customer_id'=>request('customer_id')??'all', 'search'=>request('search'), 'status'=>request('status'), 'from'=>request('from'), 'to'=>request('to')]) }}">
+                                    <img width="14" src="{{dynamicAsset(path: 'public/assets/back-end/img/excel.png')}}" alt="">
+                                    {{translate('excel')}}
+                                </a>
                             </li>
                         </ul>
                     </div>

@@ -3,7 +3,7 @@
     if($order->details) {
         foreach ($order->details as $detail) {
             $product = json_decode($detail->product_details);
-            if ($product->product_type == 'physical') {
+            if (isset($product->product_type) && $product->product_type == 'physical') {
                 $isOrderOnlyDigital = false;
             }
         }

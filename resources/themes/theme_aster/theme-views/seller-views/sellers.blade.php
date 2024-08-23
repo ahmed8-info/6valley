@@ -1,7 +1,7 @@
 @php use App\Utils\ProductManager; @endphp
 @extends('theme-views.layouts.app')
 
-@section('title', translate('all_Stores').' | '.$web_config['name']->value.' '.translate('ecommerce'))
+@section('title', (request('filter') && request('filter') == 'top-vendors' ? translate('top_Stores') : translate('all_Stores')).' | '.$web_config['name']->value.' '.translate('ecommerce'))
 
 @section('content')
     <main class="main-content d-flex flex-column gap-3 py-3 mb-30">
@@ -10,7 +10,9 @@
                 <div class="card-body">
                     <div class="row gy-2 align-items-center">
                         <div class="col-md-8">
-                            <h3 class="mb-1 text-capitalize">{{translate('all_stores')}}</h3>
+                            <h3 class="mb-1 text-capitalize">
+                                {{ (request('filter') && request('filter') == 'top-vendors' ? translate('top_Stores') : translate('all_Stores')) }}
+                            </h3>
                             <nav aria-label="breadcrumb">
                                 <ol class="breadcrumb fs-12 mb-0">
                                     <li class="breadcrumb-item"><a href="{{route('home')}}">{{translate('home')}}</a>
@@ -22,8 +24,10 @@
                         </div>
                         <div class="col-md-4">
                             <div class="custom_search position-relative float-end">
-                                <form action="{{ route('vendors') }}">
-                                    @csrf
+                                <form action="{{ route('vendors') }}" method="get">
+                                    @if(request('filter'))
+                                        <input type="hidden" name="filter" value="{{ request('filter') }}">
+                                    @endif
                                     <div class="d-flex">
                                         <div
                                             class="select-wrap focus-border border border-end-logical-0 d-flex align-items-center">
@@ -46,7 +50,7 @@
 
             <div class="card">
                 <div class="card-body">
-                    <div class="auto-col xxl-items-6 justify-content-center gap-3">
+                    <div class="auto-col xxl-items-6 justify-content-center gap-3 max-sm-grid-col-2">
                         @foreach ($sellers as $shop)
                             @php($currentDate = date('Y-m-d'))
                             @php($startDate = date('Y-m-d', strtotime($shop['vacation_start_date'])))
@@ -56,24 +60,18 @@
                                class="store-item grid-center py-2">
                                 <div class="position-relative">
                                     <div class="avatar rounded-circle border" style="--size: 6.875rem">
-                                        @if($shop['id'] != 0)
-                                            <img class="dark-support img-fit rounded-circle img-w-h-100"
-                                                 src="{{ getValidImage(path: 'storage/app/public/shop/'.$shop->image, type:'shop') }}"
-                                                 alt="{{$shop->name}}" loading="lazy">
-                                        @else
-                                            <img class="dark-support img-fit rounded-circle img-w-h-100"
-                                                 src="{{ getValidImage(path: 'storage/app/public/company/'.$shop->image, type:'shop') }}"
-                                                 alt="{{$shop->name}}" loading="lazy">
-                                        @endif
+                                        <img class="dark-support img-fit rounded-circle img-w-h-100"
+                                             src="{{ getStorageImages(path: $shop->image_full_url, type:'shop') }}"
+                                             alt="{{$shop->name}}" loading="lazy">
                                     </div>
-                                    @if($shop->vacation_status && ($currentDate >= $startDate) && ($currentDate <= $endDate))
+                                    @if($shop->temporary_close)
                                         <span class="temporary-closed position-absolute rounded-circle">
-                                        <span>{{translate('closed_now')}}</span>
-                                    </span>
-                                    @elseif($shop->temporary_close)
+                                            <span class="px-1 text-center">{{translate('Temporary_OFF')}}</span>
+                                        </span>
+                                    @elseif($shop->vacation_status && ($currentDate >= $startDate) && ($currentDate <= $endDate))
                                         <span class="temporary-closed position-absolute rounded-circle">
-                                        <span>{{translate('closed_now')}}</span>
-                                    </span>
+                                            <span>{{translate('closed_Now')}}</span>
+                                        </span>
                                     @endif
                                 </div>
 

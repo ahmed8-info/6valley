@@ -9,6 +9,10 @@
                 <th>{{ translate('filter_Criteria').' - ' }}</th>
                 <th></th>
                 <th>
+                    @if(isset($data['vendor']))
+                        {{translate('store_Name')}} - {{$data['vendor']?->shop?->name}}
+                        <br>
+                    @endif
                     {{translate('category').' - '. ($data['category'] != 'all' ? $data['category']['defaultName'] : $data['category'])  }}
                     <br>
                     {{translate('sub_Category').' - '. ($data['sub_category'] != 'all' ? $data['sub_category']['defaultName'] : $data['sub_category'])  }}

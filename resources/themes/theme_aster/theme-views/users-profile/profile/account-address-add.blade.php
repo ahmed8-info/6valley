@@ -170,10 +170,10 @@
 @endsection
 @push('script')
     <script src="{{ theme_asset('assets/plugins/select2/js/select2.min.js') }}"></script>
-    @if(getWebConfig('map_api_status') ==1 )
-    <script src="https://maps.googleapis.com/maps/api/js?key={{getWebConfig(name: 'map_api_key')}}&callback=&libraries=places&v=3.49"
-        defer>
-    </script>
-    @endif
     <script src="{{ theme_asset('assets/js/address.js') }}"></script>
+    @if(getWebConfig('map_api_status') ==1 )
+        <script
+            src="https://maps.googleapis.com/maps/api/js?key={{getWebConfig('map_api_key')}}&callback=callBackFunction&loading=async&libraries=places&v=3.56" defer>
+        </script>
+    @endif
 @endpush

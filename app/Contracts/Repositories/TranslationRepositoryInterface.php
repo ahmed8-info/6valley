@@ -35,6 +35,6 @@ interface TranslationRepositoryInterface
      * @param string $value
      * @return bool
      */
-    public function updateDataForPushNotification(string $model, string $id, string $lang, string $key, string $value):bool;
+    public function updateData(string $model, string $id, string $lang, string $key, string $value):bool;
 
 }

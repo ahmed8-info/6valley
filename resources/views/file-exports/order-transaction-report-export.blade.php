@@ -10,11 +10,11 @@
         <th>
             {{translate('search_Bar_Content').' '.'-'.' '. ($data['search'] ?? 'N/A')}}
             <br>
-            {{translate('status').' '.'-'.' '. ($data['status'] ?? translate('all'))}}
+            {{translate('status').' '.'-'.' '. translate($data['status'] ?? translate('all'))}}
             <br>
             {{translate('store')}} - {{ucwords($data['vendor'] != 'all' && $data['vendor'] !='inhouse' ? $data['vendor']?->shop->name : $data['vendor'])}}
             <br>
-            {{translate('customer')}} - {{ucwords($data['customer'] != 'all' ? $data['customer']->f_name.' '.$data['customer']->l_name : translate('all'))}}
+            {{translate('customer')}} - {{ucwords($data['customer'] != 'all' ? ($data['customer']->f_name.' '.$data['customer']->l_name) : translate('all'))}}
             <br>
             {{translate('date_type').' '.'-'.' '.translate($data['dateType'])}}
             <br>
@@ -29,7 +29,9 @@
     <tr>
         <td> {{translate('SL')}}</td>
         <td> {{translate('order_ID')}}    </td>
+        @if(isset($data['data-from']) && $data['data-from'] == 'admin')
         <td> {{translate('shop_Name')}}    </td>
+        @endif
         <td> {{translate('customer_Name')}}</td>
         <td> {{translate('total_Product_Amount')}}</td>
         <td> {{translate('product_Discount')}}</td>
@@ -43,7 +45,9 @@
         <td> {{translate('admin_Discount')}}</td>
         <td> {{translate('vendor_Discount')}}</td>
         <td> {{translate('admin_Commission')}}</td>
+        @if(isset($data['data-from']) && $data['data-from'] == 'admin')
         <td> {{translate('admin_Net_Income')}}</td>
+        @endif
         <td> {{translate('vendor_Net_income')}}</td>
         <td> {{translate('payment_Method')}}</td>
         <td> {{translate('payment_Status')}}</td>
@@ -54,6 +58,7 @@
             <td>
                 {{$transaction['order_id']}}
             </td>
+            @if(isset($data['data-from']) && $data['data-from'] == 'admin')
             <td>
                 @if($transaction['seller_is'] == 'admin')
                     {{ getWebConfig('company_name') }}
@@ -65,6 +70,7 @@
                     @endif
                 @endif
             </td>
+            @endif
             <td>
                 @if (!$transaction->order->is_guest && isset($transaction->customer))
                     {{ $transaction->customer->f_name}} {{ $transaction->customer->l_name }}
@@ -74,10 +80,10 @@
                     {{translate('not_found')}}
                 @endif
             </td>
-            <td>{{setCurrencySymbol(amount: usdToDefaultCurrency(amount: $transaction->orderDetails[0]->order_details_sum_price), currencyCode: getCurrencyCode()) }}</td>
-            <td>{{setCurrencySymbol(amount: usdToDefaultCurrency(amount: $transaction->orderDetails[0]->order_details_sum_discount), currencyCode: getCurrencyCode()) }}</td>
+            <td>{{setCurrencySymbol(amount: usdToDefaultCurrency(amount: $transaction->orderDetails[0]?->order_details_sum_price??0), currencyCode: getCurrencyCode()) }}</td>
+            <td>{{setCurrencySymbol(amount: usdToDefaultCurrency(amount: $transaction->orderDetails[0]?->order_details_sum_discount??0), currencyCode: getCurrencyCode()) }}</td>
             <td>{{setCurrencySymbol(amount: usdToDefaultCurrency(amount: $transaction->order->discount_amount), currencyCode: getCurrencyCode()) }}</td>
-            <td>{{setCurrencySymbol(amount: usdToDefaultCurrency(amount: $transaction->orderDetails[0]->order_details_sum_price - $transaction->orderDetails[0]->order_details_sum_discount - (isset($transaction->order->coupon) && $transaction->order->coupon->coupon_type != 'free_delivery'?$transaction->order->discount_amount:0)), currencyCode: getCurrencyCode()) }}</td>
+            <td>{{setCurrencySymbol(amount: usdToDefaultCurrency(amount: ($transaction->orderDetails[0]?->order_details_sum_price??0) - ($transaction->orderDetails[0]?->order_details_sum_discount??0) - (isset($transaction->order->coupon) && $transaction->order->coupon->coupon_type != 'free_delivery'?$transaction->order->discount_amount:0)), currencyCode: getCurrencyCode()) }}</td>
             <td>{{setCurrencySymbol(amount: usdToDefaultCurrency(amount: $transaction->tax ), currencyCode: getCurrencyCode()) }}</td>
             <td>{{setCurrencySymbol(amount: usdToDefaultCurrency(amount: $transaction->order->shipping_cost), currencyCode: getCurrencyCode()) }}</td>
             <td>{{setCurrencySymbol(amount: usdToDefaultCurrency(amount: $transaction->order->order_amount), currencyCode: getCurrencyCode()) }}</td>
@@ -90,9 +96,11 @@
                 {{setCurrencySymbol(amount: usdToDefaultCurrency(amount: $transaction['vendorCouponDiscount'] + $transaction['vendorShippingDiscount']), currencyCode: getCurrencyCode()) }}
             </td>
             <td>{{setCurrencySymbol(amount: usdToDefaultCurrency(amount: $transaction['admin_commission']), currencyCode: getCurrencyCode()) }}</td>
+            @if(isset($data['data-from']) && $data['data-from'] == 'admin')
             <td>
                 {{ setCurrencySymbol(amount: usdToDefaultCurrency(amount: $transaction['adminNetIncome']), currencyCode: getCurrencyCode()) }}
             </td>
+            @endif
             <td>
                 {{ setCurrencySymbol(amount: usdToDefaultCurrency(amount: $transaction['vendorNetIncome']-$transaction['vendorShippingDiscount']), currencyCode: getCurrencyCode()) }}
             </td>

@@ -143,5 +143,5 @@
 @endsection
 
 @push('script')
-    <script src="{{dynamicAsset(path: 'public/assets/back-end/js/admin/custom-role.js')}}"></script>
+    <script src="{{ dynamicAsset(path: 'public/assets/back-end/js/admin/custom-role.js') }}"></script>
 @endpush

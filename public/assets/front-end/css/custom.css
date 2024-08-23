@@ -39,7 +39,7 @@
     background: var(--web-secondary) !important;
 }
 
-[type="radio"] {
+[type="radio"]:not(.show) {
     border: 0;
     clip: rect(0 0 0 0);
     height: 1px;
@@ -50,11 +50,11 @@
     width: 1px;
 }
 
-[type="radio"] + span:after {
+[type="radio"]:not(.show) + span:after {
     box-shadow: 0 0 0 0.10em var(--web-secondary);
 }
 
-[type="radio"]:checked + span:after {
+[type="radio"]:not(.show):checked + span:after {
     background: var(--web-secondary);
     box-shadow: 0 0 0 0.10em var(--web-secondary);
 }
@@ -1265,4 +1265,178 @@ img, figure {
 }
 .owl-nav.disabled{
     display: none !important
+}
+
+
+.alert--message-2 {
+    border-left: 3px solid var(--base);
+    border-radius: 6px;
+    position: fixed;
+    right: 20px;
+    top: 80px;
+    z-index: 9999;
+    background: #fff;
+    width: 80vw;
+    display: flex;
+    max-width: 330px;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+    font-size: 12px;
+    transition: all ease 0.5s;
+}
+
+.alert--message-2 h6 {
+    font-size: 16px;
+}
+
+.alert--message-2:not(.active) {
+    transform: translateX(calc(100% + 40px));
+}
+.alert--container {
+    position: fixed;
+    right: 20px;
+    top: 80px;
+    z-index: 9999;
+    width: 80vw;
+    max-width: 330px;
+}
+.alert--container:not(.active) {
+    opacity: 0;
+    visibility: hidden;
+}
+.alert--container .alert {
+    position: unset !important;
+    top: unset !important;
+    left: unset !important;
+    right: unset !important;
+    margin-bottom: 10px;
+    width: 100% !important;
+}
+
+.alert--container .alert:not(.active) {
+    display: none;
+}
+.w--0 {
+    width: 0;
+    flex-grow: 1;
+}
+
+.shop-head-check[type='checkbox'],
+.shop-item-check[type='checkbox'] {
+    cursor: pointer;
+}
+
+[dir="rtl"] .checkbox-color input {
+    right: -9999px;
+    left: auto;
+    position: absolute;
+}
+[dir="rtl"] .checkbox-alphanumeric input{
+    right: -9999px;
+    left: auto;
+    position: absolute;
+}
+
+.color-bs-primary-force,
+.color-bs-primary-force:focus {
+    color: var(--web-primary) !important;
+}
+
+.absolute-ltr {
+    direction: ltr !important;
+}
+
+[dir="rtl"] input[type="tel" i] {
+    direction: rtl;
+}
+
+body {
+    word-break: break-word;
+}
+
+.rich-editor-html-content table {
+    color: var(--title-color);
+    max-width: 100% !important;
+}
+
+.rich-editor-html-content table > :not(caption) > * {
+    border-width: var(--bs-border-width) 0;
+}
+
+.rich-editor-html-content table > :not(caption) > * > * {
+    border-width: 0 var(--bs-border-width);
+}
+
+.rich-editor-html-content table {
+    --bs-table-color: var(--bs-body-color);
+    --bs-table-bg: transparent;
+    --bs-table-border-color: var(--bs-border-color);
+    --bs-table-accent-bg: transparent;
+    --bs-table-striped-color: var(--bs-body-color);
+    --bs-table-striped-bg: rgba(0, 0, 0, 0.05);
+    --bs-table-active-color: var(--bs-body-color);
+    --bs-table-active-bg: rgba(0, 0, 0, 0.1);
+    --bs-table-hover-color: var(--bs-body-color);
+    --bs-table-hover-bg: rgba(0, 0, 0, 0.075);
+    width: 100%;
+    margin-bottom: 1rem;
+    color: var(--bs-table-color);
+    vertical-align: top;
+    border-color: var(--bs-table-border-color);
+}
+
+.rich-editor-html-content table > :not(caption) > * > * {
+    padding: 0.5rem 0.5rem;
+    background-color: var(--bs-table-bg);
+    border-bottom-width: var(--bs-border-width);
+    box-shadow: inset 0 0 0 9999px var(--bs-table-accent-bg);
+}
+
+.rich-editor-html-content table > tbody {
+    vertical-align: inherit;
+}
+
+.rich-editor-html-content table > thead {
+    vertical-align: bottom;
+}
+
+.rich-editor-html-content table {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 575px) {
+    .rich-editor-html-content table {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+}
+
+@media (max-width: 767px) {
+    .rich-editor-html-content table {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+}
+
+@media (max-width: 991px) {
+    .rich-editor-html-content table {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+}
+
+@media (max-width: 1199px) {
+    .rich-editor-html-content table {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+}
+
+@media (max-width: 1399px) {
+    .rich-editor-html-content table {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
 }

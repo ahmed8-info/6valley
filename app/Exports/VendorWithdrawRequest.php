@@ -79,7 +79,13 @@ class VendorWithdrawRequest implements FromView, ShouldAutoSize, WithStyles,With
                     ->getAlignment()
                     ->setHorizontal(Alignment::HORIZONTAL_LEFT)
                     ->setVertical(Alignment::VERTICAL_CENTER);
-
+                if(isset($this->data['data-from']) && $this->data['data-from'] == 'vendor'){
+                    $event->sheet->mergeCells('D4:E4');
+                    $this->data['withdraw_request']->each(function($item,$index) use($event) {
+                        $index+=5;
+                        $event->sheet->mergeCells("D$index:E$index");
+                    });
+                }
                     $event->sheet->mergeCells('A1:E1');
                     $event->sheet->mergeCells('A2:B2');
                     $event->sheet->mergeCells('C2:E2');

@@ -51,6 +51,14 @@ function updateCartQuantityListMobile(minimum_order_qty, key, incr, e) {
 }
 function updateCartCommon(minimum_order_qty, key, e, quantity, ex_quantity) {
 
+    console.log(minimum_order_qty)
+    console.log(key)
+    console.log(e)
+    console.log(quantity)
+    console.log(ex_quantity)
+    console.log(ex_quantity.data('min'))
+    console.log(ex_quantity.html())
+
     if (ex_quantity.val() > ex_quantity.data('current-stock') && e == 'minus') {
         removeProductFromCartList(key)
         return false;
@@ -92,6 +100,7 @@ function updateCartCommon(minimum_order_qty, key, e, quantity, ex_quantity) {
             updateCartQuantityListCartData();
             updateCartQuantityListMobileCartData();
             renderCouponCodeApply()
+            multipleCheckBoxFunctionsInit()
         });
     }
 }
@@ -120,6 +129,7 @@ function removeProductFromCartList(key) {
             setShippingIdFunction();
             updateCartQuantityListMobileCartData();
             renderCouponCodeApply()
+            multipleCheckBoxFunctionsInit()
         }
     );
 }
@@ -156,3 +166,5 @@ function setShippingIdFunction(){
     }
 }
 setShippingIdFunction();
+
+

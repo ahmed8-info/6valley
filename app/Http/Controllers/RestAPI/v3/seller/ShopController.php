@@ -8,6 +8,7 @@ use App\Models\NotificationSeen;
 use App\Models\Shop;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class ShopController extends Controller
 {
@@ -31,6 +32,7 @@ class ShopController extends Controller
         $shop->temporary_close = $request->status;
         $shop->save();
 
+        Cache::clear();
         return response()->json(['status' => true], 200);
     }
 

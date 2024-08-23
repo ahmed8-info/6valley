@@ -3,23 +3,23 @@
 @section('title',translate('shop_Page').' | '.$web_config['name']->value.' '.translate('ecommerce'))
 @push('css_or_js')
     @if($shop['id'] != 0)
-        <meta property="og:image" content="{{dynamicStorage(path: 'storage/app/public/shop')}}/{{$shop->image}}"/>
+        <meta property="og:image" content="{{$shop->image_full_url['path']}}"/>
         <meta property="og:title" content="{{ $shop->name}} "/>
         <meta property="og:url" content="{{route('shopView',[$shop['id']])}}">
     @else
-        <meta property="og:image" content="{{dynamicStorage(path: 'storage/app/public/company')}}/{{$web_config['fav_icon']->value}}"/>
+        <meta property="og:image" content="{{$web_config['fav_icon']['path']}}"/>
         <meta property="og:title" content="{{ $shop['name']}} "/>
         <meta property="og:url" content="{{route('shopView',[$shop['id']])}}">
     @endif
     <meta property="og:description"
           content="{{ substr(strip_tags(str_replace('&nbsp;', ' ', $web_config['about']->value)),0,160) }}">
     @if($shop['id'] != 0)
-        <meta property="twitter:card" content="{{dynamicStorage(path: 'storage/app/public/shop')}}/{{$shop->image}}"/>
+        <meta property="twitter:card" content="{{$shop->image_full_url['path']}}"/>
         <meta property="twitter:title" content="{{route('shopView',[$shop['id']])}}"/>
         <meta property="twitter:url" content="{{route('shopView',[$shop['id']])}}">
     @else
         <meta property="twitter:card"
-              content="{{dynamicStorage(path: 'storage/app/public/company')}}/{{$web_config['fav_icon']->value}}"/>
+              content="{{$web_config['fav_icon']['path']}}"/>
         <meta property="twitter:title" content="{{route('shopView',[$shop['id']])}}"/>
         <meta property="twitter:url" content="{{route('shopView',[$shop['id']])}}">
     @endif
@@ -33,13 +33,13 @@
                 @if($shop['id'] != 0)
                     <div class="store-banner dark-support bg-badge overflow-hidden" data-bg-img="">
                         <img class="w-100" alt=""
-                             src="{{ getValidImage(path: 'storage/app/public/shop/banner/'.$shop->banner, type:'shop-banner') }}">
+                             src="{{ getStorageImages(path: $shop->banner_full_url, type:'shop-banner') }}">
                     </div>
                 @else
                     @php($banner=getWebConfig(name: 'shop_banner'))
                     <div class="store-banner dark-support bg-badge overflow-hidden" data-bg-img="">
                         <img class="w-100" alt=""
-                             src="{{ getValidImage(path: 'storage/app/public/shop/'.($banner ?? ""), type: 'shop-banner') }}">
+                             src="{{ getStorageImages(path: $banner, type: 'shop-banner') }}">
                     </div>
                 @endif
                 <div class="bg-primary-light p-3">
@@ -48,16 +48,16 @@
                             <div class="media gap-3">
                                 <div class="avatar rounded store-avatar overflow-hidden">
                                     <div class="position-relative">
-                                        <img src="{{ getValidImage(path: 'storage/app/public/shop/'.$shop->image, type:'shop') }}"
+                                        <img src="{{ getStorageImages(path:$shop->image_full_url, type:'shop') }}"
                                              class="dark-support rounded img-fit" alt="">
                                         @if($seller_temporary_close || $inhouse_temporary_close)
                                             <span class="temporary-closed position-absolute">
-                                            <span>{{translate('closed_now')}}</span>
-                                        </span>
+                                                <span class="text-center px-1">{{translate('Temporary_OFF')}}</span>
+                                            </span>
                                         @elseif(($seller_id==0 && $inHouseVacationStatus && $current_date >= $inhouse_vacation_start_date && $current_date <= $inhouse_vacation_end_date) ||
                                             $seller_id!=0 && $seller_vacation_status && $current_date >= $seller_vacation_start_date && $current_date <= $seller_vacation_end_date)
                                             <span class="temporary-closed position-absolute">
-                                                <span>{{translate('closed_now')}}</span>
+                                                <span class="text-center px-1">{{translate('closed_Now')}}</span>
                                             </span>
                                         @endif
                                     </div>
@@ -94,16 +94,16 @@
                                 <div class="avatar rounded store-avatar overflow-hidden">
                                     <div class="position-relative">
                                         <img class="dark-support rounded img-fit" alt=""
-                                            src="{{ getValidImage(path: 'storage/app/public/company/'.$web_config['fav_icon']->value, type:'shop') }}">
+                                            src="{{ getStorageImages(path: $web_config['fav_icon'], type:'shop') }}">
 
                                         @if($seller_temporary_close || $inhouse_temporary_close)
                                             <span class="temporary-closed position-absolute">
-                                            <span>{{translate('closed_now')}}</span>
+                                            <span>{{translate('Temporary_OFF')}}</span>
                                         </span>
                                         @elseif(($seller_id==0 && $inHouseVacationStatus && $current_date >= $inhouse_vacation_start_date && $current_date <= $inhouse_vacation_end_date) ||
                                             $seller_id!=0 && $seller_vacation_status && $current_date >= $seller_vacation_start_date && $current_date <= $seller_vacation_end_date)
                                             <span class="temporary-closed position-absolute">
-                                                <span>{{translate('closed_now')}}</span>
+                                                <span>{{translate('closed_Now')}}</span>
                                             </span>
                                         @endif
                                     </div>
@@ -179,22 +179,22 @@
                     </div>
                 </div>
             </div>
-            @if($shop['id'] != 0 && $shop->offer_banner)
+            @if($shop['id'] != 0 && $shop->bottom_banner)
                 <div class="">
-                    <img src="{{ getValidImage(path: 'storage/app/public/shop/banner/'.$shop->offer_banner, type:'shop-banner') }}"
+                    <img src="{{ getStorageImages(path: $shop->bottom_banner_full_url, type:'shop-banner') }}"
                          class="dark-support rounded img-fit" alt="">
                 </div>
             @elseif($shop['id'] == 0)
-                @php($bottom_banner=getWebConfig(name: 'offer_banner'))
-                @if($bottom_banner)
+                @php($bottomBanner=getWebConfig(name: 'bottom_banner'))
+                @if($bottomBanner)
                     <div>
-                        <img src="{{ getValidImage(path: 'storage/app/public/shop/'.$bottom_banner, type:'shop') }}"
+                        <img src="{{ getStorageImages(path: $bottomBanner, type:'shop-banner') }}"
                              class="dark-support rounded img-fit" alt="">
                     </div>
                 @endif
             @endif
         </div>
-        @if (count($featured_products) > 0)
+        @if (count($featuredProductsList) > 0)
             <section class="bg-primary-light">
                 <div class="container">
                     <div class="">
@@ -214,7 +214,7 @@
                                          data-swiper-navigation-prev=".top-rated-nav-prev"
                                          data-swiper-breakpoints='{"0": {"slidesPerView": "1"}, "320": {"slidesPerView": "2"}, "992": {"slidesPerView": "3"}, "1200": {"slidesPerView": "4"}, "1400": {"slidesPerView": "5"}}'>
                                         <div class="swiper-wrapper">
-                                            @foreach ($featured_products as $product)
+                                            @foreach ($featuredProductsList as $product)
                                                 <div class="swiper-slide mx-w300">
                                                     @include('theme-views.partials._product-large-card', ['product'=>$product])
                                                 </div>

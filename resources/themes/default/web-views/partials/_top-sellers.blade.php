@@ -1,7 +1,7 @@
 <div class="container rtl pt-4 px-0 px-md-3">
     <div class="seller-card">
         <div class="card __shadow h-100">
-            <div class="card-body pb-1">
+            <div class="card-body">
                 <div class="row d-flex justify-content-between">
                     <div class="seller-list-title">
                         <h5 class="font-bold m-0 text-capitalize">
@@ -10,7 +10,7 @@
                     </div>
                     <div class="seller-list-view-all">
                         <a class="text-capitalize view-all-text web-text-primary"
-                            href="{{route('vendors')}}">
+                            href="{{ route('vendors', ['filter'=>'top-vendors']) }}">
                             {{ translate('view_all')}}
                             <i class="czi-arrow-{{Session::get('direction') === "rtl" ? 'left mr-1 ml-n1 mt-1 float-left' : 'right ml-1 mr-n1'}}"></i>
                         </a>
@@ -23,31 +23,24 @@
                         @foreach ($topVendorsList as $vendorData)
                             <a href="{{route('shopView',['id'=> $vendorData['id']])}}" class="others-store-card text-capitalize">
                                 <div class="overflow-hidden other-store-banner">
-                                    @if($vendorData['id'] != 0)
-                                        <img class="w-100 h-100 object-cover" alt=""
-                                         src="{{ getValidImage(path: 'storage/app/public/shop/banner/'.($vendorData->banner), type: 'shop-banner') }}">
-                                    @else
-                                        <img class="w-100 h-100 object-cover" alt=""
-                                             src="{{ getValidImage(path: 'storage/app/public/shop/'.($vendorData->banner), type: 'shop-banner') }}">
-                                    @endif
+                                    <img class="w-100 h-100 object-cover" alt=""
+                                         src="{{ getStorageImages(path: $vendorData->banner_full_url, type: 'shop-banner') }}">
                                 </div>
                                 <div class="name-area">
                                     <div class="position-relative">
                                         <div class="overflow-hidden other-store-logo rounded-full">
-                                            @if($vendorData['id'] != 0)
-                                                <img class="rounded-full" alt="{{ translate('store') }}"
-                                                     src="{{ getValidImage(path: 'storage/app/public/shop/'.($vendorData->image), type: 'shop') }}">
-                                            @else
-                                                <img class="rounded-full" alt="{{ translate('store') }}"
-                                                     src="{{ getValidImage(path: 'storage/app/public/company/'.($vendorData->image), type: 'shop') }}">
-                                            @endif
+                                            <img class="rounded-full" alt="{{ translate('store') }}"
+                                                 src="{{ getStorageImages(path: $vendorData->image_full_url, type: 'shop') }}">
                                         </div>
 
-                                        @if($vendorData->temporary_close || ($vendorData->vacation_status &&
-                                        ($current_date >= $vendorData->vacation_start_date) && ($current_date <= $vendorData->vacation_end_date)))
+                                        @if($vendorData->temporary_close)
                                             <span class="temporary-closed position-absolute text-center rounded-full p-2">
-                                            <span>{{translate('closed_now')}}</span>
-                                        </span>
+                                                <span>{{translate('Temporary_OFF')}}</span>
+                                            </span>
+                                        @elseif($vendorData->vacation_status && ($current_date >= $vendorData->vacation_start_date) && ($current_date <= $vendorData->vacation_end_date))
+                                            <span class="temporary-closed position-absolute text-center rounded-full p-2">
+                                                <span>{{translate('closed_now')}}</span>
+                                            </span>
                                         @endif
                                     </div>
                                     <div class="info pt-2">

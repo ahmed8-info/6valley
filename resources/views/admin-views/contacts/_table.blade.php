@@ -8,7 +8,7 @@
             <th>{{translate('customer_Name')}}</th>
             <th>{{translate('contact_Info')}}</th>
             <th>{{translate('subject')}}</th>
-            <th>{{translate('Time & Date')}}</th>
+            <th>{{translate('time_&_Date')}}</th>
             <th class="text-center">{{translate('reply_status')}}</th>
             <th class="text-center">{{translate('action')}}</th>
         </tr>
@@ -25,9 +25,9 @@
                     </div>
                 </td>
                 <td class="text-wrap">{{$contact['subject']}}</td>
-                <td class="text-wrap" title="Querries about latest deal about computer Develop ghkgfhjgfk" data-toggle="tooltip" data-custom-class="darker-tooltip">
+                <td class="text-wrap" title="{{date('d M,Y h:i A',strtotime($contact['created_at']))}}" data-toggle="tooltip" data-custom-class="darker-tooltip">
                     <div class="line--limit-2 max-w-200">
-                        Querries about latest deal about computer Develop ghkgfhjgfk
+                        {{date('d M,Y h:i A',strtotime($contact['created_at']))}}
                     </div>
                 </td>
                 <td class="text-center">

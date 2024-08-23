@@ -2,22 +2,28 @@
 
 namespace App\Http\Controllers\Vendor;
 
+use App\Contracts\Repositories\VendorRepositoryInterface;
+use App\Exports\ProductReportExport;
+use App\Exports\ProductStockReportExport;
 use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Models\OrderDetail;
 use App\Models\Product;
-use App\Utils\BackEndHelper;
 use App\Utils\Helpers;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
-use Rap2hpoutre\FastExcel\FastExcel;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class ProductReportController extends Controller
 {
-
+    public function __construct(
+        private readonly VendorRepositoryInterface $vendorRepo,
+    )
+    {
+    }
     public function all_product(Request $request){
         $search = $request['search'];
         $from = $request['from'];
@@ -313,13 +319,14 @@ class ProductReportController extends Controller
             });
     }
 
-    public function all_product_export_excel(Request $request){
+    public function allProductExportExcel(Request $request):BinaryFileResponse
+    {
         $search = $request['search'];
         $from = $request['from'];
         $to = $request['to'];
         $date_type = $request['date_type'] ?? 'this_year';
-        $seller_id = auth('seller')->id();
-
+        $vendorId = auth('seller')->id();
+        $vendor = $this->vendorRepo->getFirstWhere(params:['id' => $vendorId]);
         $product_query = Product::with(['reviews'])
             ->with(['orderDetails' => function ($query) {
                 $query->select(
@@ -327,32 +334,25 @@ class ProductReportController extends Controller
                     DB::raw('SUM(qty * price) as total_sold_amount'),
                     DB::raw('SUM(qty) as product_quantity'),
                 )
-                ->where('delivery_status', 'delivered')->groupBy('product_id')
-                ->groupBy('product_id');
+                    ->where('delivery_status', 'delivered')->groupBy('product_id')
+                    ->groupBy('product_id');
             }])
             ->when($search, function ($query) use ($search) {
                 $query->orWhere('name', 'like', "%{$search}%");
             })
-            ->where(['user_id' => $seller_id, 'added_by' => 'seller']);
-
+            ->where(['user_id' => $vendorId, 'added_by' => 'seller']);
         $products = self::create_date_wise_common_filter($product_query, $date_type, $from, $to)->latest('created_at')->get();
+        $data = [
+            'products' =>$products,
+            'search' =>$request['search'],
+            'seller' => $vendor,
+            'from' => $request['from'],
+            'to' => $request['to'],
+            'date_type' => $request['date_type'] ?? 'this_year'
+        ];
 
-        $reportData = array();
-        foreach ($products as $key=>$product) {
-            $rating = count($product->rating)>0?number_format($product->rating[0]->average, 2, '.', ' '):0;
-            $reportData[$key] = array(
-                'Product Name' => Str::limit($product->name, 20),
-                'Product Unit Price' => BackEndHelper::set_symbol(BackEndHelper::usd_to_currency($product->unit_price)),
-                'Total Amount Sold' => BackEndHelper::set_symbol(BackEndHelper::usd_to_currency(isset($product->orderDetails[0]->total_sold_amount) ? $product->orderDetails[0]->total_sold_amount : 0)),
-                'Average Product Value' => BackEndHelper::set_symbol(BackEndHelper::usd_to_currency((isset($product->orderDetails[0]->total_sold_amount) ? $product->orderDetails[0]->total_sold_amount : 0) / (isset($product->orderDetails[0]->product_quantity) ? $product->orderDetails[0]->product_quantity : 1))),
-                'Current Stock Amount' => $product->product_type == 'digital' ? ($product->status==1 ? translate('available') : translate('not_available')) : $product->current_stock,
-                'Average Ratings' => $rating.' ('.$product->reviews->count().')',
-            );
-        }
-
-        return (new FastExcel($reportData))->download('all_product_report.xlsx');
+        return Excel::download(new ProductReportExport($data) , 'Product-Report-List.xlsx');
     }
-
     public function stock_product_report(Request $request)
     {
         $search = $request['search'];
@@ -368,31 +368,24 @@ class ProductReportController extends Controller
         return view('vendor-views.report.product-stock', compact('products', 'categories','search', 'stock_limit', 'sort','category_id'));
     }
 
-    public function product_stock_export(Request $request)
+
+    public function productStockExport(Request $request):BinaryFileResponse
     {
-        $products = self::stock_product_common_query($request)->get();
         $stock_limit = Helpers::get_business_settings('stock_limit');
-
-        $data = array();
-        foreach ($products as $product) {
-            if($product['current_stock'] >= $stock_limit){
-                $stock_msg = 'In-Stock';
-            }elseif($product['current_stock']  == 0){
-                $stock_msg = 'Out of Stock';
-            }else{
-                $stock_msg = 'Soon Stock Out';
-            }
-            $data[] = array(
-                'Product Name' => $product->name,
-                'Date' => date('d M Y', strtotime($product->updated_at)),
-                'Current Stock' => $product->current_stock,
-                'Status' => $stock_msg,
-            );
-        }
-
-        return (new FastExcel($data))->download('out_of_stock_product.xlsx');
+        $products = self::stock_product_common_query($request)->get();
+        $vendorId = auth('seller')->id();
+        $vendor = $this->vendorRepo->getFirstWhere(params:['id' => $vendorId]);
+        $category = $request->has('category_id') && $request['category_id'] != 'all' ? (Category::find($request->category_id)) : ($request['category_id'] ??'all');
+        $data = [
+            'products' =>$products,
+            'search' => $request['search'],
+            'seller' => $vendor,
+            'category' => $category,
+            'sort' => $request['sort'] ?? 'ASC',
+            'stock_limit' => $stock_limit,
+        ];
+        return Excel::download(new ProductStockReportExport($data) , 'Product-stock-report.xlsx');
     }
-
     public function stock_product_common_query($request){
         $sort = $request['sort'] ?? 'ASC';
         $category_id = $request['category_id'] ?? 'all';

@@ -3,13 +3,13 @@
 @section('title',translate($data['data_from']).' '.translate('products'))
 
 @push('css_or_js')
-    <meta property="og:image" content="{{dynamicStorage(path: 'storage/app/public/company')}}/{{$web_config['web_logo']}}"/>
+    <meta property="og:image" content="{{$web_config['web_logo']['path']}}"/>
     <meta property="og:title" content="Products of {{$web_config['name']}} "/>
     <meta property="og:url" content="{{env('APP_URL')}}">
     <meta property="og:description"
           content="{{ substr(strip_tags(str_replace('&nbsp;', ' ', $web_config['about']->value)),0,160) }}">
 
-    <meta property="twitter:card" content="{{dynamicStorage(path: 'storage/app/public/company')}}/{{$web_config['web_logo']}}"/>
+    <meta property="twitter:card" content="{{$web_config['web_logo']['path']}}"/>
     <meta property="twitter:title" content="Products of {{$web_config['name']}}"/>
     <meta property="twitter:url" content="{{env('APP_URL')}}">
     <meta property="twitter:description"
@@ -79,7 +79,7 @@
         <div class="search-page-header">
             <div>
                 <h5 class="font-semibold mb-1">{{translate(str_replace('_',' ',$data['data_from']))}} {{translate('products')}} {{ isset($data['brand_name']) ? '('.$data['brand_name'].')' : ''}}</h5>
-                <div><span class="view-page-item-count">{{$products->total()}}</span> {{translate('items_found')}}</div>
+                <div><span>{{$products->total()}}</span> {{translate('items_found')}}</div>
             </div>
             <form id="search-form" class="d-none d-lg-block" action="{{ route('products') }}" method="GET">
                 <input hidden name="data_from" value="{{$data['data_from']}}">
@@ -227,7 +227,7 @@
                                 </div>
                                 <ul id="lista1" class="__brands-cate-wrap" data-simplebar
                                     data-simplebar-auto-hide="false">
-                                    @foreach(\App\Utils\BrandManager::get_active_brands() as $brand)
+                                    @foreach($activeBrands as $brand)
                                         <div
                                             class="brand mt-2 for-brand-hover {{Session::get('direction') === "rtl" ? 'mr-2' : ''}}"
                                             id="brand">
@@ -252,9 +252,11 @@
                     <div class="mt-3 __cate-side-arrordion">
                         <div>
                             <div class="text-center __cate-side-title">
-                                <span class="widget-title font-semibold">{{translate('categories')}}</span>
+                                <span class="widget-title font-semibold">
+                                    {{ translate('categories') }}
+                                </span>
                             </div>
-                            @php($categories=\App\Utils\CategoryManager::parents())
+
                             <div class="accordion mt-n1 __cate-side-price" id="shop-categories">
                                 @foreach($categories as $category)
                                     <div class="menu--caret-accordion">
@@ -315,7 +317,7 @@
                         </div>
                     </div>
                 </div>
-
+                <div class="sidebar-overlay"></div>
             </aside>
 
             <section class="col-lg-9">

@@ -3,11 +3,11 @@
 namespace App\Listeners;
 
 use App\Events\AddFundToWalletEvent;
-use App\Mail\AddFundToWallet;
-use Illuminate\Support\Facades\Mail;
+use App\Traits\EmailTemplateTrait;
 
 class AddFundToWalletListener
 {
+    use EmailTemplateTrait;
     /**
      * Create the event listener.
      *
@@ -30,11 +30,8 @@ class AddFundToWalletListener
     }
 
     private function sendMail(AddFundToWalletEvent $event):void{
-        $walletTransaction = $event->walletTransaction;
-        try{
-            Mail::to($event->email)->send(new AddFundToWallet($walletTransaction));
-        }catch(\Exception $exception) {
-            info($exception);
-        }
+        $email = $event->email;
+        $data = $event->data;
+        $this->sendingMail(sendMailTo: $email,userType: $data['userType'],templateName: $data['templateName'],data: $data);
     }
 }

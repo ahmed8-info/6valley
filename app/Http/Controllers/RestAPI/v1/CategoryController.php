@@ -7,41 +7,49 @@ use App\Models\Category;
 use App\Models\Product;
 use App\Utils\CategoryManager;
 use App\Utils\Helpers;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class CategoryController extends Controller
 {
-    public function get_categories(Request $request)
+    public function get_categories(Request $request): JsonResponse
     {
-        $categories_id = [];
-        if($request->has('seller_id') && !empty($request->seller_id)){
-            //finding category ids
-            $categories_id = Product::active()
-                ->when($request->has('seller_id') && !empty($request->seller_id), function ($query) use ($request) {
+        $categoriesID = [];
+        if ($request->has('seller_id') && $request['seller_id'] != null) {
+            // Finding category ids
+            $categoriesID = Product::active()
+                ->when($request->has('seller_id') && $request['seller_id'] != null && $request['seller_id'] != 0, function ($query) use ($request) {
                     return $query->where(['added_by' => 'seller'])
-                        ->where('user_id', $request->seller_id);
+                        ->where('user_id', $request['seller_id']);
+                })->when($request->has('seller_id') && $request['seller_id'] != null && $request['seller_id'] == 0, function ($query) use ($request) {
+                    return $query->where(['added_by' => 'admin',
+                    ]);
                 })->pluck('category_id');
         }
 
-        $categories = Category::when($request->has('seller_id') && !empty($request->seller_id), function ($query) use ($categories_id) {
-            $query->whereIn('id', $categories_id);
-        })
-        ->withCount(['product'=>function($query) use($request){
-            $query->when($request->has('seller_id') && !empty($request->seller_id), function($query) use($request){
-                $query->where(['added_by'=>'seller','user_id'=>$request->seller_id,'status'=>'1']);
-            });
-        }])->with(['childes' => function ($query) {
-            $query->with(['childes' => function ($query) {
-                $query->withCount(['subSubCategoryProduct'])->where('position', 2);
-            }])->withCount(['subCategoryProduct'])->where('position', 1);
-        }, 'childes.childes'])
-        ->where('position', 0)->priority()->get();
+        $categories = Category::when($request->has('seller_id') && $request['seller_id'] != null, function ($query) use ($categoriesID) {
+                $query->whereIn('id', $categoriesID);
+            })
+            ->with(['product' => function ($query) {
+                return $query->active()->withCount(['orderDetails']);
+            }])
+            ->withCount(['product' => function ($query) use ($request) {
+                $query->when($request->has('seller_id') && !empty($request['seller_id']), function ($query) use ($request) {
+                    $query->where(['added_by' => 'seller', 'user_id' => $request['seller_id'], 'status' => '1']);
+                });
+            }])->with(['childes' => function ($query) {
+                $query->with(['childes' => function ($query) {
+                    $query->withCount(['subSubCategoryProduct'])->where('position', 2);
+                }])->withCount(['subCategoryProduct'])->where('position', 1);
+            }, 'childes.childes'])
+            ->where(['position' => 0])->get();
 
-        return response()->json($categories, 200);
+        $categories = CategoryManager::getPriorityWiseCategorySortQuery(query: $categories);
 
+        return response()->json($categories->values());
     }
 
-    public function get_products(Request $request, $id)
+    public function get_products(Request $request, $id): JsonResponse
     {
         return response()->json(Helpers::product_data_formatting(CategoryManager::products($id, $request), true), 200);
     }

@@ -28,13 +28,14 @@ class HelpTopicController extends BaseController
 
     public function getListView(): View
     {
-        $helps = $this->helpTopicRepo->getListWhere(orderBy: ['id' => 'desc'], dataLimit: 'all');
+        $helps = $this->helpTopicRepo->getListWhere(orderBy: ['id' => 'desc'], filters: ['type' => 'default'],dataLimit: 'all');
         return view(HelpTopic::LIST[VIEW], compact('helps'));
     }
 
     public function add(HelpTopicAddRequest $request): RedirectResponse
     {
         $this->helpTopicRepo->add(data: [
+            'type' => $request['type'] ?? 'default',
             'question' => $request['question'],
             'answer' => $request['answer'],
             'status' => $request->get('status', 0),
@@ -65,6 +66,7 @@ class HelpTopicController extends BaseController
             'question' => $request['question'],
             'answer' => $request['answer'],
             'ranking' => $request['ranking'],
+            'status' => $request->get('status', 0),
         ]);
         Toastr::success(translate('FAQ_Update_successfully'));
         return back();

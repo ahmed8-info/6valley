@@ -294,8 +294,8 @@ function basicFunctionalityForCartSummary() {
                     success: function (response) {
                         if (Boolean(response.checkProductTypeForWalkingCustomer) === true){
                             $('#add-customer').modal('show');
-                            $('.alert--message-3').removeClass('d-none');
-                            $('.warning-message').empty().html(response.message);
+                            $('.alert--message-for-pos').addClass('active');
+                            $('.alert--message-for-pos .warning-message').empty().html(response.message);
                         }else {
                             location.reload();
                         }
@@ -819,16 +819,22 @@ function getVariantPrice(type = null) {
                     $(".quick-view-modal-add-cart-button").text(
                         $("#message-update-to-cart").data("text")
                     );
+
                     if (type == null) {
                         $(".in-cart-quantity-field").val(data.inCartData.quantity);
                         data.inCartData.quantity == 1
-                            ? buttonDisableOrEnableFunction('in-cart-quantity-minus',true )
+                            ? buttonDisableOrEnableFunction('in-cart-quantity-minus', true)
                             : "";
+                        price = data.inCartData.price;
+                        tax = data.inCartData.tax;
+                        discount = (data.inCartData.discount * data.inCartData.quantity);
+                    } else {
+                        price = data.price;
+                        tax = data.tax;
+                        discount = (data.discount * data.requestQuantity);
                     }
-                    price = data.inCartData.price;
-                    tax = data.inCartData.tax;
-                    discount = (data.inCartData.discount*data.inCartData.quantity);
-                    stockStatus(data.quantity,'in-cart-quantity-plus','in-cart-quantity-field')
+
+                    stockStatus(data.quantity, 'in-cart-quantity-plus', 'in-cart-quantity-field')
                 }
                 setProductData('price-section',price,tax,discount);
             },
@@ -1017,5 +1023,5 @@ function setProductData(parentClass,price,tax,discount){
     $('.'+parentClass+' '+'.set-discount-amount').html(discount);
 }
 $('.close-alert--message-for-pos').on('click',function (){
-    $('.alert--message-for-pos').addClass('d-none');
+    $('.alert--message-for-pos').removeClass('active');
 })

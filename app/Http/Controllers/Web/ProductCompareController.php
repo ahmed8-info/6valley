@@ -51,7 +51,7 @@ class ProductCompareController extends BaseController
         $compareLists = $this->productCompareRepo->getListWhere(
             orderBy: ['id' => 'desc'],
             filters: ['user_id' => $customerId, 'whereHas' => 'product'],
-            relations: ['product'],
+            relations: ['product', 'product.digitalVariation'],
             dataLimit: 'all'
         );
         $attributes = [];
@@ -60,6 +60,7 @@ class ProductCompareController extends BaseController
                 orderBy: ['id' => 'desc'], dataLimit: 'all',
             );
         }
+
         return view(VIEW_FILE_NAMES['account_compare_list'], compact('compareLists','attributes'));
     }
 
@@ -84,6 +85,7 @@ class ProductCompareController extends BaseController
                         dataLimit: 'all'
                     );
                     $compareProductIds = $compareLists->pluck('product_id')->toArray();
+                    session()->forget(SessionKey::PRODUCT_COMPARE_LIST);
                     session()->put(SessionKey::PRODUCT_COMPARE_LIST, $compareProductIds);
                     return response()->json([
                         'error' => translate("compare_list_Removed"),
@@ -110,6 +112,7 @@ class ProductCompareController extends BaseController
                         dataLimit: 'all'
                     );
                     $compareProductIds = $compareLists->pluck('product_id')->toArray();
+                    session()->forget(SessionKey::PRODUCT_COMPARE_LIST);
                     session()->put(SessionKey::PRODUCT_COMPARE_LIST, $compareProductIds);
                     return response()->json([
                         'success' => translate("product_added_to_compare_list"),
@@ -128,8 +131,27 @@ class ProductCompareController extends BaseController
             $compareList = $this->productCompareRepo->getFirstWhere(params: ['user_id' => $customerId, 'product_id' => $request['product_id']]);
             if ($compareList) {
                 return redirect()->back();
-            }else {
+            } else {
+                $compareLists = $this->productCompareRepo->getListWhere(
+                    orderBy: ['id' => 'asc'],
+                    filters: ['user_id' => $customerId, 'whereHas' => 'product'],
+                    dataLimit: 'all'
+                );
+                if ($compareLists->count() == 3) {
+                    $compareList = $compareLists->first();
+                    $this->productCompareRepo->delete(params: ['id' => $compareList['id']]);
+                }
+
                 $this->productCompareRepo->add(data: $this->productCompareService->getAddData(customerId: $customerId, productId: $request['product_id']));
+                $compareLists = $this->productCompareRepo->getListWhere(
+                    orderBy: ['id' => 'desc'],
+                    filters: ['user_id' => $customerId, 'whereHas' => 'product'],
+                    relations: ['product'],
+                    dataLimit: 'all'
+                );
+                $compareProductIds = $compareLists->pluck('product_id')->toArray();
+                session()->forget(SessionKey::PRODUCT_COMPARE_LIST);
+                session()->put(SessionKey::PRODUCT_COMPARE_LIST, $compareProductIds);
             }
             return redirect()->back();
         }
@@ -147,6 +169,7 @@ class ProductCompareController extends BaseController
             filters: ['user_id' => auth('customer')->id()],
             dataLimit: 'all'
         )->pluck('product_id')->toArray();
+        session()->forget(SessionKey::PRODUCT_COMPARE_LIST);
         session()->put(SessionKey::PRODUCT_COMPARE_LIST, $compareLists);
         return redirect()->back();
     }
@@ -163,6 +186,7 @@ class ProductCompareController extends BaseController
             filters: ['user_id' => auth('customer')->id()],
             dataLimit: 'all'
         )->pluck('product_id')->toArray();
+        session()->forget(SessionKey::PRODUCT_COMPARE_LIST);
         session()->put(SessionKey::PRODUCT_COMPARE_LIST, $compareLists);
         return redirect()->back();
     }

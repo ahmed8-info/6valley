@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers\Customer\Auth;
 
-use App\Events\PasswordResetMailEvent;
+use App\Events\PasswordResetEvent;
 use App\Http\Controllers\Controller;
 use App\Models\PasswordReset;
-use App\User;
+use App\Models\User;
 use App\Utils\Helpers;
 use App\Utils\SMS_module;
 use Brian2694\Toastr\Facades\Toastr;
@@ -67,9 +67,16 @@ class ForgotPasswordController extends Controller
                             $reset_data->updated_at = now();
                             $reset_data->save();
                         }
-                        $reset_url = url('/') . '/customer/auth/reset-password?token=' . $token;
-                        PasswordResetMailEvent::dispatch($customer['email'], $reset_url);
-
+                        $resetUrl = url('/') . '/customer/auth/reset-password?token=' . $token;
+                        $data = [
+                            'userType' => 'customer',
+                            'templateName' => 'forgot-password',
+                            'userName' => $customer['f_name'],
+                            'subject' => translate('password_reset'),
+                            'title' => translate('password_reset'),
+                            'passwordResetURL' => $resetUrl,
+                        ];
+                        event(new PasswordResetEvent(email: $customer['email'],data: $data));
                         Toastr::success(translate('Check_your_email').' '.translate('Password_reset_url_sent'));
                     } catch (\Exception $exception) {
                         Toastr::error(translate('email_is_not_configured').'. '.translate('contact_with_the_administrator'));

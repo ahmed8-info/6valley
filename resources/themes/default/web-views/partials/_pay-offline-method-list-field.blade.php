@@ -6,7 +6,7 @@
         $orderWiseShippingDiscount = \App\Utils\CartManager::order_wise_shipping_discount();
         $totalDiscountOnProduct = 0;
         $cart = \App\Utils\CartManager::get_cart();
-        $shippingCost = \App\Utils\CartManager::get_shipping_cost();
+        $shippingCost = \App\Utils\CartManager::get_shipping_cost(type: 'checked');
         $getShippingCostSavedForFreeDelivery = \App\Utils\CartManager::get_shipping_cost_saved_for_free_delivery();
         $couponDiscount = session()->has('coupon_discount') ? session('coupon_discount') : 0;
         if ($cart->count() > 0) {

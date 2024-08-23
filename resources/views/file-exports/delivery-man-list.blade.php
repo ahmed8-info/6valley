@@ -9,6 +9,10 @@
                 <th>{{ translate('delivery_Man_Analytics') .' '.'-'}}</th>
                 <th></th>
                 <th>
+                    @if(isset($data['vendor']))
+                        {{translate('store_Name')}} - {{$data['vendor']?->shop?->name}}
+                        <br>
+                    @endif
                         {{translate('total_Delivery_Man').' '.'-'.' '.count($data['delivery_men'])}}
                     <br>
                         {{translate('active_Delivery_Man').' '.'-'.' '.$data['active']}}

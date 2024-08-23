@@ -44,7 +44,7 @@ class OrderSettingsController extends BaseController
         $this->businessSettingRepo->updateOrInsert(type: 'free_delivery_status', value: $request->get('free_delivery_status', 0));
         $this->businessSettingRepo->updateOrInsert(type: 'free_delivery_responsibility', value: $request['free_delivery_responsibility']);
         $this->businessSettingRepo->updateOrInsert(type: 'guest_checkout', value: $request->get('guest_checkout', 0));
-        $this->businessSettingRepo->updateOrInsert(type: 'free_delivery_over_amount_seller', value: usdToDefaultCurrency(amount: $request['free_delivery_over_amount_seller']) ?? 0);
+        $this->businessSettingRepo->updateOrInsert(type: 'free_delivery_over_amount_seller', value: currencyConverter(amount: $request['free_delivery_over_amount_seller']) ?? 0);
         Toastr::success(translate('successfully_updated'));
         return back();
     }

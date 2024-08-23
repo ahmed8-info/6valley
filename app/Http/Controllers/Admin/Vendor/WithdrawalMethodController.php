@@ -80,7 +80,7 @@ class WithdrawalMethodController extends BaseController
         }
 
         Toastr::success(translate('withdrawal_method_added_successfully'));
-        return redirect()->route('admin.vendor.withdraw-method.list');
+        return redirect()->route('admin.vendors.withdraw-method.list');
     }
 
     public function delete($id): RedirectResponse

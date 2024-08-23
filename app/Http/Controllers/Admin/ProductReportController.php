@@ -12,6 +12,7 @@ use Carbon\CarbonPeriod;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class ProductReportController extends Controller
 {
@@ -318,7 +319,8 @@ class ProductReportController extends Controller
             ->whereBetween('created_at', [$start_date, $end_date]);
     }
 
-    public function all_product_export_excel(Request $request){
+    public function allProductExportExcel(Request $request):BinaryFileResponse
+    {
         $search = $request['search'];
         $from = $request['from'];
         $to = $request['to'];
@@ -358,7 +360,6 @@ class ProductReportController extends Controller
         ];
 
         return Excel::download(new ProductReportExport($data) , 'Product-Report-List.xlsx');
-        // return (new FastExcel($reportData))->download('all_product_report.xlsx');
     }
 
     public function create_date_wise_common_filter($query, $date_type, $from, $to)

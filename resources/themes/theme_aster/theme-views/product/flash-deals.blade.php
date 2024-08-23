@@ -47,12 +47,10 @@
                             </div>
                             <div class="card-body">
                                 <div class="row g-3" id="filtered-products" class="minWidth-12rem">
-                                    @foreach($deal->products as $product)
-                                    @if(!empty($product->product))
+                                    @foreach($flashDealProducts as $flashDealProduct)
                                         <div class="col-xxl-2 col-xl-3 col-md-4 col-sm-6">
-                                            @include('theme-views.partials._product-small-card',['product'=>$product->product])
+                                            @include('theme-views.partials._product-small-card',['product' => $flashDealProduct])
                                         </div>
-                                        @endif
                                     @endforeach
                                 </div>
                             </div>

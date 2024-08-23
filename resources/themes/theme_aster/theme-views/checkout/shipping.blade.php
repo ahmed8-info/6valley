@@ -313,7 +313,41 @@
                                         </div>
                                     </div>
                                 </form>
+
+                                @if(!Auth::guard('customer')->check() && $web_config['guest_checkout_status'])
+                                    <div class="card __card mt-3">
+                                        <div class="card-body">
+                                            <div class="d-flex align-items-center flex-wrap justify-content-between gap-3">
+                                                <div class="min-h-45 d-flex gap-2 align-items-center cursor-pointer user-select-none">
+                                                    <input type="checkbox" id="is_check_create_account" name="is_check_create_account">
+                                                    <label class="fw-bold fs-13 mb-0" for="is_check_create_account">
+                                                        {{translate('Create_an_account_with_the_above_info')}}
+                                                    </label>
+                                                </div>
+
+                                                <div class="is_check_create_account_password_group d--none">
+                                                    <div class="d-flex gap-3 flex-wrap flex-sm-nowrap">
+                                                        <div class="">
+                                                            <div class="input-inner-end-ele">
+                                                                <input name="customer_password" type="password" id="customer_password" class="form-control" placeholder="{{ translate('new_Password') }}" required="">
+                                                                <i class="bi bi-eye-slash-fill togglePassword"></i>
+                                                            </div>
+                                                        </div>
+                                                        <div class="">
+                                                            <div class="input-inner-end-ele">
+                                                                <input name="customer_confirm_password" type="password" id="customer_confirm_password" class="form-control" placeholder="{{ translate('confirm_Password') }}" required="">
+                                                                <i class="bi bi-eye-slash-fill togglePassword"></i>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                @endif
+
                             @endif
+
                             @if($billing_input_by_customer)
                                 <div class="mt-5 {{ $billing_input_by_customer ? '':'d-none' }}">
                                     <div class="bg-light rounded p-3 mt-20">
@@ -334,9 +368,11 @@
                                     </div>
 
                                     @if(!$physical_product_view)
-                                        <div class="rounded px-3 py-3 fs-15 text-base font-weight-medium bg-light mt-2 d-flex align-items-center gap-2">
-                                            <img src="{{ theme_asset('assets/img/icons/info-light.svg') }}" alt="">
-                                            <span>{{ translate('When_you_input_all_the_required_information_for_this_billing_address_it_will_be_stored_for_future_purchases') }}</span>
+                                        <div class="my-3 alert--info">
+                                            <div class="d-flex align-items-center gap-2">
+                                                <img class="mb-1" src="{{ theme_asset('assets/img/icons/info-light.svg') }}" alt="Info">
+                                                <span>{{ translate('When_you_input_all_the_required_information_for_this_billing_address_it_will_be_stored_for_future_purchases') }}</span>
+                                            </div>
                                         </div>
                                     @endif
 
@@ -609,11 +645,11 @@
                                                                 <div class="col-sm-12">
                                                                     <div class="form-group mb-3">
                                                                         <label
-                                                                            for="billing-address">{{ translate('address') }}</label>
+                                                                            for="billing_address">{{ translate('address') }}</label>
                                                                         <div
                                                                             class="form-control focus-border rounded d-flex align-items-center">
                                                                             <input type="text" name="billing_address"
-                                                                                   id="billing-address"
+                                                                                   id="billing_address"
                                                                                    class="flex-grow-1 text-dark bg-transparent border-0 focus-input"
                                                                                    placeholder="{{ translate('your_address') }}" {{$shipping_addresses->count()==0?'required':''}}>
 
@@ -651,6 +687,38 @@
                                         </div>
                                     </form>
                                 </div>
+
+                                @if(!Auth::guard('customer')->check() && $web_config['guest_checkout_status'] && !$physical_product_view)
+                                    <div class="card __card mt-3">
+                                        <div class="card-body">
+                                            <div class="d-flex align-items-center flex-wrap justify-content-between gap-3">
+                                                <div class="min-h-45 d-flex gap-2 align-items-center cursor-pointer user-select-none">
+                                                    <input type="checkbox" id="is_check_create_account" name="is_check_create_account">
+                                                    <label class="fw-bold fs-13 mb-0" for="is_check_create_account">
+                                                        {{ translate('Create_account_with_above_info') }}
+                                                    </label>
+                                                </div>
+
+                                                <div class="is_check_create_account_password_group d--none">
+                                                    <div class="d-flex gap-3 flex-wrap flex-sm-nowrap">
+                                                        <div class="">
+                                                            <div class="input-inner-end-ele">
+                                                                <input name="customer_password" type="password" id="customer_password" class="form-control" placeholder="{{ translate('new_Password') }}" required="">
+                                                                <i class="bi bi-eye-slash-fill togglePassword"></i>
+                                                            </div>
+                                                        </div>
+                                                        <div class="">
+                                                            <div class="input-inner-end-ele">
+                                                                <input name="customer_confirm_password" type="password" id="customer_confirm_password" class="form-control" placeholder="{{ translate('confirm_Password') }}" required="">
+                                                                <i class="bi bi-eye-slash-fill togglePassword"></i>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                @endif
                             @endif
                         </div>
                     </div>
@@ -667,7 +735,11 @@
 @endsection
 @push('script')
     <script src="{{ theme_asset('assets/js/shipping-page.js') }}"></script>
-    <script
-        src="https://maps.googleapis.com/maps/api/js?key={{getWebConfig(name: 'map_api_key')}}&callback=mapsLoading&libraries=places&v=3.49"
-        defer></script>
+
+    @if(getWebConfig('map_api_status') ==1 )
+        <script
+            src="https://maps.googleapis.com/maps/api/js?key={{getWebConfig('map_api_key')}}&callback=mapsLoading&loading=async&libraries=places&v=3.56"
+            defer>
+        </script>
+    @endif
 @endpush

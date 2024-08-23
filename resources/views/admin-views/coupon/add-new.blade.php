@@ -202,7 +202,7 @@
                                 <th>{{translate('coupon_type')}}</th>
                                 <th>{{translate('duration')}}</th>
                                 <th>{{translate('user_limit')}}</th>
-                                <th>{{translate('discount_bearer')}}</th>
+                                <th class="text-center">{{translate('discount_bearer')}}</th>
                                 <th>{{translate('status')}}</th>
                                 <th class="text-center">{{translate('action')}}</th>
                             </tr>
@@ -231,7 +231,7 @@
                                             <strong>{{ $coupon['order_count'] }}</strong>
                                         </span>
                                     </td>
-                                    <td>{{ $coupon['coupon_bearer'] == 'inhouse' ? 'admin':$coupon['coupon_bearer'] }}</td>
+                                    <td class="text-center">{{ translate($coupon['coupon_bearer'] == 'inhouse' ? 'admin':$coupon['coupon_bearer']) }}</td>
                                     <td>
                                         <form
                                             action="{{route('admin.coupon.status',[$coupon['id'],$coupon['status']?0:1])}}"

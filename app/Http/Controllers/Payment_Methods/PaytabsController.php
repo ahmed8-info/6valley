@@ -30,7 +30,7 @@ class Paytabs
         $data['profile_id'] = $this->config_values->profile_id;
         $curl = curl_init();
         curl_setopt_array($curl, array(
-            CURLOPT_URL => $this->config_values->base_url,
+            CURLOPT_URL => $this->config_values->base_url . '/' . $request_url,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_ENCODING => '',
             CURLOPT_MAXREDIRS => 10,

@@ -84,6 +84,13 @@ class CustomerReviewListExport implements FromView, ShouldAutoSize, WithStyles,W
                     ->getAlignment()
                     ->setHorizontal(Alignment::HORIZONTAL_LEFT)
                     ->setVertical(Alignment::VERTICAL_CENTER);
+                if(isset($this->data['data-from']) && $this->data['data-from'] == 'vendor'){
+                    $event->sheet->mergeCells('F3:G3');
+                    $this->data['reviews']->each(function($item,$index) use($event) {
+                        $index+=4;
+                        $event->sheet->mergeCells("F$index:G$index");
+                    });
+                }
 
                     $event->sheet->mergeCells('A1:G1');
                     $event->sheet->mergeCells('A2:B2');

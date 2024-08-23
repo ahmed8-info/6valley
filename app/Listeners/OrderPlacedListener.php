@@ -3,6 +3,7 @@
 namespace App\Listeners;
 
 use App\Events\OrderPlacedEvent;
+use App\Traits\EmailTemplateTrait;
 use App\Traits\PushNotificationTrait;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
@@ -10,7 +11,7 @@ use Illuminate\Support\Facades\Mail;
 
 class OrderPlacedListener
 {
-    use PushNotificationTrait;
+    use PushNotificationTrait, EmailTemplateTrait;
 
     /**
      * Create the event listener.
@@ -25,26 +26,28 @@ class OrderPlacedListener
      */
     public function handle(OrderPlacedEvent $event): void
     {
-        if($event->emailInfo){
+        if ($event->email) {
             $this->sendMail($event);
         }
-        if($event->notification){
+        if ($event->notification) {
             $this->sendNotification($event);
         }
 
     }
 
-    private function sendMail(OrderPlacedEvent $event):void{
-        $orderId = $event->emailInfo->orderId;
-        $email = $event->emailInfo->email;
-        try{
-            Mail::to($email)->send(new \App\Mail\OrderPlaced($orderId));
-        }catch(\Exception $exception) {
-            info($exception);
+    private function sendMail(OrderPlacedEvent $event): void
+    {
+        $email = $event->email;
+        $data = $event->data;
+        try {
+            $this->sendingMail(sendMailTo: $email, userType: $data['userType'], templateName: $data['templateName'], data: $data);
+        } catch (\Exception $exception) {
+
         }
     }
 
-    private function sendNotification(OrderPlacedEvent $event):void{
+    private function sendNotification(OrderPlacedEvent $event): void
+    {
         $key = $event->notification->key;
         $type = $event->notification->type;
         $order = $event->notification->order;

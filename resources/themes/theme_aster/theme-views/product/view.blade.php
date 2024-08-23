@@ -4,12 +4,12 @@
 @section('title',translate(str_replace(['-', '_', '/'],' ',$data['data_from'])).' '.translate('products'))
 
 @push('css_or_js')
-    <meta property="og:image" content="{{dynamicStorage(path: 'storage/app/public/company')}}/{{$web_config['web_logo']}}"/>
+    <meta property="og:image" content="{{$web_config['web_logo']['path']}}"/>
     <meta property="og:title" content="Products of {{$web_config['name']}} "/>
     <meta property="og:url" content="{{env('APP_URL')}}">
     <meta property="og:description"
           content="{{ substr(strip_tags(str_replace('&nbsp;', ' ', $web_config['about']->value)),0,160) }}">
-    <meta property="twitter:card" content="{{dynamicStorage(path: 'storage/app/public/company')}}/{{$web_config['web_logo']}}"/>
+    <meta property="twitter:card" content="{{$web_config['web_logo']['path']}}"/>
     <meta property="twitter:title" content="Products of {{$web_config['name']}}"/>
     <meta property="twitter:url" content="{{env('APP_URL')}}">
     <meta property="twitter:description"
@@ -90,8 +90,8 @@
                                                 <button type="button"
                                                         class="border-0 bg-transparent dropdown-toggle p-0 custom-pe-3"
                                                         data-bs-toggle="dropdown" aria-expanded="false">
-                                                    {{$data['data_from']=="best-selling"||$data['data_from']=="top-rated"||$data['data_from']=="featured_deal"||$data['data_from']=="latest"||$data['data_from']=="most-favorite"?
-                                                    str_replace(['-', '_', '/'], ' ', translate($data['data_from'])):translate('Choose_Option')}}
+                                                    {{$data['data_from']=="best-selling"||$data['data_from']=="top-rated"||$data['data_from']=="featured_deal"||$data['data_from']=="latest"|| $data['data_from']=="most-favorite" || $data['data_from']=="featured" ?
+                                                    ucwords(str_replace(['-', '_', '/'], ' ', translate($data['data_from']))) : translate('Choose_Option')}}
                                                 </button>
                                                 <ul class="dropdown-menu dropdown-menu-end">
                                                     <li class="{{$data['data_from']=='latest'? 'selected':''}}">
@@ -116,6 +116,12 @@
                                                         <a class="d-flex"
                                                            href="{{route('products',['id'=> $data['id'],'data_from'=>'most-favorite','page'=>1])}}">
                                                             {{translate('Most_Favorite')}}
+                                                        </a>
+                                                    </li>
+                                                    <li class="{{$data['data_from']=='featured'? 'selected':''}}">
+                                                        <a class="d-flex"
+                                                           href="{{route('products',['id'=> $data['id'],'data_from'=>'featured','page'=>1])}}">
+                                                            {{ translate('featured') }}
                                                         </a>
                                                     </li>
                                                     @if($web_config['featured_deals'])
@@ -146,7 +152,7 @@
                         <div class="card-body d-flex flex-column gap-4">
                             <div>
                                 <h6 class="mb-3">{{translate('Categories')}}</h6>
-                                @php($categories=CategoryManager::parents())
+
                                 <div class="products_aside_categories">
                                     <ul class="common-nav flex-column nav custom-scrollbar flex-nowrap custom_common_nav">
                                         @foreach($categories as $category)
@@ -202,11 +208,11 @@
 
                             @if($web_config['brand_setting'])
                                 <div>
-                                    @php($brands = BrandManager::get_active_brands())
+
                                     <h6 class="mb-3">{{translate('Brands')}}</h6>
                                     <div class="products_aside_brands">
                                         <ul class="common-nav nav flex-column pe-2">
-                                            @foreach($brands as $brand)
+                                            @foreach($activeBrands as $brand)
                                                 <li>
                                                     <div class="flex-between-gap-3 align-items-center">
                                                         <label class="custom-checkbox">
@@ -220,7 +226,7 @@
                                         </ul>
                                     </div>
 
-                                    @if($brands->count() > 10)
+                                    @if($activeBrands->count() > 10)
                                         <div class="d-flex justify-content-center">
                                             <button
                                                 class="btn-link text-primary btn_products_aside_brands text-capitalize">{{translate('more_brands').'...'}}

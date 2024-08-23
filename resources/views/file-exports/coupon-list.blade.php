@@ -7,7 +7,13 @@
     <tr>
         <th>{{translate('search_Criteria').' '.'-'}}</th>
         <th></th>
-        <th>  {{translate('search_Bar_Content').' '.'-'.' '.!empty($data['search']) ? $data['search'] : 'N/A'}}</th>
+        <th>
+            {{translate('search_Bar_Content').' '.'-'.' '.($data['search'] ?? 'N/A')}}
+            @if(isset($data['vendor']))
+                <br>
+                {{translate('store_Name')}} - {{$data['vendor']?->shop?->name}}
+            @endif
+        </th>
     </tr>
     <tr>
         <td> {{translate('SL')}}    </td>
@@ -36,7 +42,7 @@
             <td> {{ $item['discount_type'] == 'percentage' ? setCurrencySymbol(amount: usdToDefaultCurrency(amount: $item['max_discount'] ?? 0)) : 'N/A'   }}    </td>
             <td> {{ translate($item['discount_type']) }} </td>
             <td> {{ setCurrencySymbol(amount: usdToDefaultCurrency(amount: $item['discount'] ?? 0))  }}    </td>
-            <td> {{translate($item['coupon_bearer'] == 'inhouse' ? 'admin' : $item['coupon_bearer'])}}    </td>
+            <td> {{translate($item['coupon_bearer'] == 'inhouse' ? 'admin' : ($item['coupon_bearer'] == 'seller' ? 'vendor' : $item['coupon_bearer']))}}    </td>
             <td> {{date('d M, y',strtotime($item['start_date']))}}    </td>
             <td> {{date('d M, y',strtotime($item['expire_date']))}}    </td>
         </tr>

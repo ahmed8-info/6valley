@@ -14,7 +14,11 @@
                             </div>
 
                             <h6 class="font-black fw-bold text-center">
-                                {{ translate('order_Placed_Successfully')}}!
+                                @if(isset($isNewCustomerInSession) && $isNewCustomerInSession)
+                                    {{ translate('Order_Placed_&_Account_Created_Successfully') }}!
+                                @else
+                                    {{ translate('Order_Placed_Successfully') }}!
+                                @endif
                             </h6>
 
                             @if (isset($order_ids) && count($order_ids) > 0)

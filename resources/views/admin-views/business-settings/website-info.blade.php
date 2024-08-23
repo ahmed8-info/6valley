@@ -560,7 +560,7 @@
                         <div class="card-body d-flex flex-column justify-content-around">
                             <div class="d-flex justify-content-center">
                                 <img height="60" id="view-website-logo" alt=""
-                                     src="{{ getValidImage(path: 'storage/app/public/company/'. $businessSetting['web_logo'] , type: 'backend-basic') }}">
+                                     src="{{ getStorageImages(path: $businessSetting['web_logo'] , type: 'backend-basic') }}">
                             </div>
                             <div class="mt-4 position-relative">
                                 <input type="file" name="company_web_logo" id="website-logo"
@@ -585,7 +585,7 @@
                         <div class="card-body d-flex flex-column justify-content-around">
                             <div class="d-flex justify-content-center">
                                 <img height="60" id="view-website-footer-logo"
-                                     src="{{ getValidImage(path: 'storage/app/public/company/'. $businessSetting['footer_logo'] , type: 'backend-basic') }}"alt="">
+                                     src="{{ getStorageImages(path: $businessSetting['footer_logo'] , type: 'backend-basic') }}"alt="">
                             </div>
                             <div class="position-relative mt-4">
                                 <input type="file" name="company_footer_logo" id="website-footer-logo"
@@ -609,7 +609,7 @@
                         <div class="card-body d-flex flex-column justify-content-around">
                             <div class="d-flex justify-content-center">
                                 <img height="60" id="view-website-fav-icon"
-                                     src="{{ getValidImage(path: 'storage/app/public/company/'. $businessSetting['fav_icon'] , type: 'backend-basic') }}" alt="">
+                                     src="{{ getStorageImages(path:$businessSetting['fav_icon'] , type: 'backend-basic') }}" alt="">
                             </div>
                             <div class="position-relative mt-4">
                                 <input type="file" name="company_fav_icon" id="website-fav-icon"
@@ -633,7 +633,7 @@
                         <div class="card-body d-flex flex-column justify-content-around">
                             <div class="d-flex justify-content-center">
                                 <img height="60" id="view-loader-icon"
-                                     src="{{ getValidImage(path: 'storage/app/public/company/'. $businessSetting['loader_gif'] , type: 'backend-basic') }}" alt="">
+                                     src="{{ getStorageImages(path: $businessSetting['loader_gif'] , type: 'backend-basic') }}" alt="">
                             </div>
                             <div class="position-relative mt-4">
                                 <input type="file" name="loader_gif" id="loader-icon"
@@ -657,7 +657,7 @@
                         <div class="card-body d-flex flex-column justify-content-around">
                             <div class="d-flex justify-content-center">
                                 <img height="60" id="view-app-logo"
-                                     src="{{ getValidImage(path: 'storage/app/public/company/'. $businessSetting['mob_logo'] , type: 'backend-basic') }}" alt="">
+                                     src="{{ getStorageImages(path: $businessSetting['mob_logo'] , type: 'backend-basic') }}" alt="">
                             </div>
                             <div class="mt-4 position-relative">
                                 <input type="file" name="company_mobile_logo" id="app-logo"
@@ -682,8 +682,10 @@
 
 @push('script')
     @if(getWebConfig('map_api_status') ==1 )
-    <script src="https://maps.googleapis.com/maps/api/js?key={{getWebConfig('map_api_key')}}&callback=initAutocomplete&libraries=places&v=3.49"
-        defer></script>
+    <script
+        src="https://maps.googleapis.com/maps/api/js?key={{getWebConfig('map_api_key')}}&callback=initAutocomplete&loading=async&libraries=places&v=3.56"
+        defer>
+    </script>
     @endif
     <script src="{{dynamicAsset(path: 'public/assets/back-end/js/admin/business-setting/business-setting.js')}}"></script>
 @endpush

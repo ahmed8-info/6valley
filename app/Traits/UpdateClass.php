@@ -2,9 +2,13 @@
 
 namespace App\Traits;
 
+use App\Models\Admin;
 use App\Models\Brand;
 use App\Models\Category;
+use App\Models\EmailTemplate;
 use App\Models\Shop;
+use App\Repositories\EmailTemplatesRepository;
+use App\Services\EmailTemplateService;
 use App\Utils\Helpers;
 use App\Enums\GlobalConstant;
 use App\Http\Controllers\InstallController;
@@ -13,7 +17,7 @@ use App\Models\Product;
 use App\Models\BusinessSetting;
 use App\Models\NotificationMessage;
 use App\Models\Order;
-use App\User;
+use App\Models\User;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
@@ -22,6 +26,7 @@ use Illuminate\Support\Str;
 
 trait UpdateClass
 {
+    use EmailTemplateTrait;
     public function insert_data_of($version_number)
     {
         if ($version_number == '13.0') {
@@ -605,11 +610,76 @@ trait UpdateClass
             }
         }
 
+        if ($version_number == '14.6') {
+            Product::where(['product_type' => 'digital'])->update(['current_stock' => 999999999]);
+
+            //priority setup and vendor registration data process
+            InstallController::getPrioritySetupAndVendorRegistrationData();
+
+            if(Admin::count()>0 && EmailTemplate::count()<1) {
+                $emailTemplateUserData = [
+                    'admin',
+                    'customer',
+                    'vendor',
+                    'delivery-man',
+                ];
+                foreach ($emailTemplateUserData as $key => $value) {
+                    $this->getEmailTemplateDataForUpdate($value);
+                }
+            }
+        }
+
+        Artisan::call('file:permission');
+
+        if ($version_number == '14.7') {
+            if (BusinessSetting::where(['type' => 'storage_connection_type'])->first() == false) {
+                DB::table('business_settings')->insert([
+                    'type' => 'storage_connection_type',
+                    'value' => 'public',
+                    'updated_at' => now()
+                ]);
+            }
+
+            if (BusinessSetting::where(['type' => 'google_search_console_code'])->first() == false) {
+                DB::table('business_settings')->insert([
+                    'type' => 'google_search_console_code',
+                    'value' => '',
+                    'updated_at' => now()
+                ]);
+            }
+
+            if (BusinessSetting::where(['type' => 'bing_webmaster_code'])->first() == false) {
+                DB::table('business_settings')->insert([
+                    'type' => 'bing_webmaster_code',
+                    'value' => '',
+                    'updated_at' => now()
+                ]);
+            }
+
+            if (BusinessSetting::where(['type' => 'baidu_webmaster_code'])->first() == false) {
+                DB::table('business_settings')->insert([
+                    'type' => 'baidu_webmaster_code',
+                    'value' => '',
+                    'updated_at' => now()
+                ]);
+            }
+
+            if (BusinessSetting::where(['type' => 'yandex_webmaster_code'])->first() == false) {
+                DB::table('business_settings')->insert([
+                    'type' => 'yandex_webmaster_code',
+                    'value' => '',
+                    'updated_at' => now()
+                ]);
+            }
+
+            InstallController::updateRobotTexFile();
+        }
 
         if(DOMAIN_POINTED_DIRECTORY == 'public' && function_exists('shell_exec')) {
             shell_exec('ln -s ../resources/themes themes');
             Artisan::call('storage:link');
         }
+
     }
 
     public static function notification_message_processing(){
@@ -658,9 +728,11 @@ trait UpdateClass
 
             if($is_true){
                 $notification = NotificationMessage::where('key',$data)->first();
-                $notification->message = $value['message'];
-                $notification->status = $value['status'];
-                $notification->save();
+                if(isset($value['message'])){
+                    $notification->message = $value['message'];
+                    $notification->status = $value['status'];
+                    $notification->save();
+                }
             }
         }
 
@@ -889,6 +961,5 @@ trait UpdateClass
         }
         return true;
     }
-
 
 }

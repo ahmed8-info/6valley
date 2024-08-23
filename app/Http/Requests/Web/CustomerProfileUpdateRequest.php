@@ -67,10 +67,15 @@ class CustomerProfileUpdateRequest extends FormRequest
                     );
                 }
 
-                if ($this['password']) {
+                if ($this['password'] && !empty($this['password']) && empty($this['confirm_password'])) {
+                    $validator->errors()->add(
+                        'confirm_password.required', translate('confirm_password_is_required')
+                    );
+                } elseif ($this['confirm_password'] && !empty($this['confirm_password']) && empty($this['password'])) {
                     $validator->errors()->add(
                         'password.required', translate('password_is_required')
                     );
+                } elseif ($this['password'] != $this['confirm_password']) {
                     $validator->errors()->add(
                         'password.same:confirm_password', translate('passwords_must_match_with_confirm_password')
                     );

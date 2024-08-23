@@ -30,7 +30,7 @@
                                 <div class="col-sm-6 col-12">
                                     <div class="form-group">
                                         <label class="input-label d-flex" for="customer">{{translate('customer')}}</label>
-                                        <select id='form-customer' name="customer_id" data-placeholder="{{translate('select_customer')}}" class="get-customer-list-by-ajax-request" required>
+                                        <select id='form-customer' name="customer_id" data-placeholder="{{translate('select_customer')}}" class="get-customer-list-without-all-customer" required>
                                         </select>
                                     </div>
                                 </div>

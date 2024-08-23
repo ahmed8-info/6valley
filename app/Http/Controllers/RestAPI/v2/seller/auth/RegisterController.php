@@ -1,8 +1,6 @@
 <?php
 
 namespace App\Http\Controllers\RestAPI\v2\seller\auth;
-
-use App\Events\VendorRegistrationMailEvent;
 use App\Http\Controllers\Controller;
 use App\Models\Seller;
 use App\Models\Shop;

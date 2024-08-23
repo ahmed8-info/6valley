@@ -128,7 +128,7 @@
                         {{translate('total_Vendor')}}
                         <span class="badge badge-soft-dark radius-50 fz-12">{{ count($table_earning['seller_earn_table']) }}</span>
                     </h4>
-                    <div>
+                    <div class="dropdown">
                         <button type="button" class="btn btn-outline--primary text-nowrap btn-block"
                                 data-toggle="dropdown">
                             <i class="tio-download-to"></i>
@@ -182,7 +182,7 @@
                             <td>
                                 <div>
                                     <h6 class="mb-1">
-                                        @if($seller_earn['seller_id'] && $seller_earn['name'])
+                                        @if(isset($seller_earn['seller_id']) && isset($seller_earn['name']))
                                             <a class="title-color" href="{{ route('admin.vendors.view', ['id' => $seller_earn['seller_id']]) }}">{{ $seller_earn['name'] }}</a>
                                         @else
                                             <span class="title-color">{{ translate('vendor_not_found') }}</span>

@@ -128,9 +128,8 @@
                                    value="{{ $search }}" required>
                             <button type="submit" class="btn btn--primary">{{translate('search')}}</button>
                         </div>
-                        <!-- End Search -->
                     </form>
-                    <div>
+                    <div class="dropdown">
                         <button type="button" class="btn btn-outline--primary text-nowrap btn-block"
                                 data-toggle="dropdown">
                             <i class="tio-download-to"></i>
@@ -138,8 +137,12 @@
                             <i class="tio-chevron-down"></i>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-right">
-                            <li><a class="dropdown-item"
-                                   href="{{ route('vendor.report.all-product-excel', ['search' => request('search'), 'date_type' => request('date_type'), 'from' => request('from'), 'to' => request('to')]) }}">{{translate('excel')}}</a>
+                            <li>
+                                <a class="dropdown-item"
+                                   href="{{ route('vendor.report.all-product-excel', ['search' => request('search'), 'date_type' => request('date_type'), 'from' => request('from'), 'to' => request('to')]) }}">
+                                    <img width="14" src="{{dynamicAsset(path: 'public/assets/back-end/img/excel.png')}}" alt="">
+                                    {{translate('excel')}}
+                                </a>
                             </li>
                         </ul>
                     </div>

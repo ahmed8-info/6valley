@@ -35,6 +35,8 @@ class RefundListener
                 $key = 'refund_request_status_changed_by_admin';
             } elseif ($status == 'rejected') {
                 $key = 'refund_request_canceled_message';
+            }elseif ($status == 'refund_request') {
+                $key = 'refund_request_message';
             } else {
                 $key = 'order_refunded_message';
             }

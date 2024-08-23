@@ -98,7 +98,16 @@ class LoginController extends Controller
                 }
                 if ($emailServices_smtp['status'] == 1) {
                     try{
-                        DeliverymanPasswordResetEvent::dispatch($delivery_man['email'], $otp);
+
+                        $data = [
+                            'userType' => 'delivery-man',
+                            'templateName' => 'reset-password-verification',
+                            'deliveryManName' => $delivery_man['f_name'],
+                            'subject' => translate('OTP_Verification_for_password_reset'),
+                            'title' => translate('OTP_Verification'),
+                            'verificationCode' => $otp,
+                        ];
+                        event(new DeliverymanPasswordResetEvent(email: $delivery_man['email'],data: $data));
                     }catch(\Exception $ex)
                     {
                         return response()->json(['message' => translate('email_send_failed')], 403);

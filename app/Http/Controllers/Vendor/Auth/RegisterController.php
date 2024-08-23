@@ -2,16 +2,20 @@
 
 namespace App\Http\Controllers\Vendor\Auth;
 
+use App\Contracts\Repositories\BusinessSettingRepositoryInterface;
+use App\Contracts\Repositories\EmailTemplatesRepositoryInterface;
+use App\Contracts\Repositories\HelpTopicRepositoryInterface;
 use App\Contracts\Repositories\ShopRepositoryInterface;
 use App\Contracts\Repositories\VendorRepositoryInterface;
 use App\Contracts\Repositories\VendorWalletRepositoryInterface;
-use App\Enums\SessionKey;
 use App\Enums\ViewPaths\Vendor\Auth;
-use App\Events\VendorRegistrationMailEvent;
+use App\Events\VendorRegistrationEvent;
 use App\Http\Controllers\BaseController;
 use App\Http\Requests\Vendor\VendorAddRequest;
+use App\Repositories\VendorRegistrationReasonRepository;
 use App\Services\ShopService;
 use App\Services\VendorService;
+use App\Traits\EmailTemplateTrait;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
@@ -19,16 +23,21 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Brian2694\Toastr\Facades\Toastr;
-use Illuminate\Support\Facades\Session;
 
 class RegisterController extends BaseController
 {
+    use EmailTemplateTrait;
     public function __construct(
         private readonly VendorRepositoryInterface $vendorRepo,
         private readonly VendorWalletRepositoryInterface $vendorWalletRepo,
         private readonly ShopRepositoryInterface $shopRepo,
         private readonly VendorService $vendorService,
         private readonly ShopService $shopService,
+        private readonly EmailTemplatesRepositoryInterface $emailTemplatesRepo,
+        private readonly BusinessSettingRepositoryInterface $businessSettingRepo,
+        private readonly HelpTopicRepositoryInterface $helpTopicRepo,
+        private readonly VendorRegistrationReasonRepository $vendorRegistrationReasonRepo,
+
     )
     {
     }
@@ -46,7 +55,17 @@ class RegisterController extends BaseController
             Toastr::warning(translate('access_denied').'!!');
             return redirect('/');
         }
-        return view(VIEW_FILE_NAMES[Auth::VENDOR_REGISTRATION[VIEW]]);
+        $vendorRegistrationHeader = json_decode($this->businessSettingRepo->getFirstWhere(params: ['type' => 'vendor_registration_header'])['value']);
+        $vendorRegistrationReasons = $this->vendorRegistrationReasonRepo->getListWhere(orderBy: ['priority' => 'desc'], filters: ['status' => 1], dataLimit: 'all');
+        $sellWithUs = json_decode($this->businessSettingRepo->getFirstWhere(params: ['type' => 'vendor_registration_sell_with_us'])['value']);
+        $downloadVendorApp = json_decode($this->businessSettingRepo->getFirstWhere(params: ['type' => 'download_vendor_app'])['value']);
+        $businessProcess = json_decode($this->businessSettingRepo->getFirstWhere(params: ['type' => 'business_process_main_section'])['value']);
+        $businessProcessStep = json_decode($this->businessSettingRepo->getFirstWhere(params: ['type' => 'business_process_step'])['value']);
+        $helpTopics = $this->helpTopicRepo->getListWhere(
+            orderBy: ['id' => 'desc'],
+            filters: ['type' => 'vendor_registration', 'status' => '1'],
+            dataLimit: 'all');
+        return view(VIEW_FILE_NAMES[Auth::VENDOR_REGISTRATION[VIEW]],compact('vendorRegistrationHeader','vendorRegistrationReasons','sellWithUs','downloadVendorApp','helpTopics','businessProcess','businessProcessStep'));
     }
 
     public function add(VendorAddRequest $request): JsonResponse
@@ -56,14 +75,14 @@ class RegisterController extends BaseController
         $this->vendorWalletRepo->add($this->vendorService->getInitialWalletData(vendorId: $vendor['id']));
 
         $data = [
-            'name' => $request['f_name'],
+            'vendorName' => $request['f_name'],
             'status' => 'pending',
             'subject' => translate('Vendor_Registration_Successfully_Completed'),
-            'title' => translate('registration_Complete') . '!',
-            'message' => translate('congratulation') . '!' . translate('Your_registration_request_has_been_send_to_admin_successfully') . '!' . translate('Please_wait_until_admin_reviewal') . '.',
+            'title' => translate('Vendor_Registration_Successfully_Completed'),
+            'userType' => 'vendor',
+            'templateName' => 'registration',
         ];
-
-        event(new VendorRegistrationMailEvent($request['email'], $data));
+        event(new VendorRegistrationEvent(email:$request['email'],data: $data));
         return response()->json([
                 'redirectRoute' => route('vendor.auth.login')
             ]

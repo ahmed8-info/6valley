@@ -311,8 +311,8 @@ function basicFunctionalityForCartSummary() {
                     success: function (response) {
                         if (Boolean(response.checkProductTypeForWalkingCustomer) === true){
                             $('#add-customer').modal('show');
-                            $('.alert--message-3').removeClass('d-none');
-                            $('.warning-message').empty().html(response.message);
+                            $('.alert--message-for-pos').addClass('active');
+                            $('.alert--message-for-pos .warning-message').empty().html(response.message);
                         }else {
                             location.reload();
                         }
@@ -1023,5 +1023,5 @@ function setProductData(parentClass,price,tax,discount){
     $('.'+parentClass+' '+'.set-discount-amount').html(discount);
 }
 $('.close-alert--message-for-pos').on('click',function (){
-    $('.alert--message-for-pos').addClass('d-none');
+    $('.alert--message-for-pos').removeClass('active');
 })

@@ -12,10 +12,11 @@
             @php($total_shipping_cost=0)
             @php($order_wise_shipping_discount=CartManager::order_wise_shipping_discount())
             @php($total_discount_on_product=0)
-            @php($cart=CartManager::get_cart())
+            @php($cart=CartManager::get_cart(type: 'checked'))
+            @php($cartAll=CartManager::get_cart())
             @php($cart_group_ids=CartManager::get_cart_group_ids())
-            @php($shipping_cost=CartManager::get_shipping_cost())
-            @php($get_shipping_cost_saved_for_free_delivery=CartManager::get_shipping_cost_saved_for_free_delivery())
+            @php($shipping_cost=CartManager::get_shipping_cost(type: 'checked'))
+            @php($get_shipping_cost_saved_for_free_delivery=CartManager::get_shipping_cost_saved_for_free_delivery(type: 'checked'))
             @if($cart->count() > 0)
                 @foreach($cart as $key => $cartItem)
                     @php($product_price_total+=$cartItem['price']*$cartItem['quantity'])
@@ -28,7 +29,11 @@
                 @else
                     @php($total_shipping_cost=$shipping_cost)
                 @endif
-            @else
+            @endif
+
+            @if($cartAll->count() > 0 && $cart->count() == 0)
+                <span>{{ translate('Please_checked_items_before_proceeding_to_checkout') }}</span>
+            @elseif($cartAll->count() == 0)
                 <span>{{ translate('empty_cart') }}</span>
             @endif
 

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin\Promotion;
 
+use App\Contracts\Repositories\BusinessSettingRepositoryInterface;
 use App\Contracts\Repositories\FlashDealRepositoryInterface;
 use App\Enums\ViewPaths\Admin\FeatureDeal;
 use App\Http\Controllers\BaseController;
@@ -19,6 +20,7 @@ class FeaturedDealController extends BaseController
      */
     public function __construct(
         private readonly FlashDealRepositoryInterface        $flashDealRepo,
+        private readonly BusinessSettingRepositoryInterface $businessSettingRepo,
     ){}
 
     public function index(?Request $request, string $type = null): View|Collection|LengthAwarePaginator|null|callable|RedirectResponse
@@ -35,7 +37,8 @@ class FeaturedDealController extends BaseController
             withCount: ['products'=>'products'],
             dataLimit: getWebConfig('pagination_limit')
         );
-        return view(FeatureDeal::LIST[VIEW], compact('flashDeals'));
+        $featureDealPriority = json_decode($this->businessSettingRepo->getFirstWhere(params: ['type' => 'feature_deal_priority'])['value']);
+        return view(FeatureDeal::LIST[VIEW], compact('flashDeals','featureDealPriority'));
     }
 
     public function getUpdateView($deal_id): View

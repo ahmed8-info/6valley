@@ -29,14 +29,14 @@
                data-product-id="{{$product['id']}}"
                id="wishlist-{{$product['id']}}"
                class="btn-wishlist stopPropagation add-to-wishlist wishlist-{{$product['id']}} {{($wishlist == 1?'wishlist_icon_active':'')}}"
-               title="Add to wishlist">
+               title="{{ translate('add_to_wishlist') }}">
                 <i class="bi bi-heart"></i>
             </a>
             <a href="javascript:"
                class="btn-compare stopPropagation add-to-compare compare_list-{{$product['id']}} {{($compare_list == 1?'compare_list_icon_active':'')}}"
                data-action="{{route('product-compare.index')}}"
                data-product-id="{{$product['id']}}"
-               id="compare_list-{{$product['id']}}" title="{{('add_to_compare')}}">
+               id="compare_list-{{$product['id']}}" title="{{translate('add_to_compare_list')}}">
                 <i class="bi bi-repeat"></i>
             </a>
             <a href="javascript:" class="btn-quickview stopPropagation get-quick-view"
@@ -48,7 +48,7 @@
 
         <div class="product__thumbnail align-items-center d-flex h-100 justify-content-center">
             <img class="dark-support rounded" alt=""
-                 src="{{ getValidImage(path: 'storage/app/public/product/thumbnail/'.$product['thumbnail'], type: 'product') }}">
+                 src="{{ getStorageImages(path: $product->thumbnail_full_url, type: 'product') }}">
         </div>
         @if(($product['product_type'] == 'physical') && ($product['current_stock'] < 1))
             <div class="product__notify">

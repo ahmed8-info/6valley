@@ -11,7 +11,7 @@ use App\Contracts\Repositories\SubscriptionRepositoryInterface;
 use App\Contracts\Repositories\TranslationRepositoryInterface;
 use App\Enums\ViewPaths\Admin\Customer;
 use App\Enums\ExportFileNames\Admin\Customer as CustomerExport;
-use App\Events\CustomerRegistrationMailEvent;
+use App\Events\CustomerRegistrationEvent;
 use App\Events\CustomerStatusUpdateEvent;
 use App\Exports\CustomerListExport;
 use App\Exports\CustomerOrderListExport;
@@ -23,6 +23,7 @@ use App\Repositories\ShippingAddressRepository;
 use App\Services\CustomerService;
 use App\Services\PasswordResetService;
 use App\Services\ShippingAddressService;
+use App\Traits\EmailTemplateTrait;
 use App\Traits\PaginatorTrait;
 use Brian2694\Toastr\Facades\Toastr;
 use Illuminate\Contracts\Foundation\Application;
@@ -36,7 +37,7 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class CustomerController extends BaseController
 {
-    use PaginatorTrait;
+    use PaginatorTrait,EmailTemplateTrait;
 
     public function __construct(
         private readonly CustomerRepositoryInterface        $customerRepo,
@@ -82,22 +83,14 @@ class CustomerController extends BaseController
         $this->customerRepo->update(id:$request['id'],data:['is_active'=>$request->get('status', 0)]);
         $this->customerRepo->deleteAuthAccessTokens(id:$request['id']);
         $customer = $this->customerRepo->getFirstWhere(params: ['id'=>$request['id']]);
-
-        if ($customer['is_active']) {
-            $message = translate('your_account_has_been_successfully_unblocked.').' '.translate('we_appreciate_your_cooperation_in_resolving_this_issue.').' '.translate('thank_you_for_your_understanding_and_patience.');
-        } else {
-            $message = translate('your_account_has_been_blocked_due_to_suspicious_activity_by_admin.').' '.translate('to_resolve_this_issue_please_contact_with_admin_or_support_center.').' '.translate('we_apologize_for_any_inconvenience_caused.');
-        }
-
         $data = [
-            'name' => $customer['f_name'],
-            'email' => $customer['email'],
-            'status' => $customer['is_active'],
+            'userName' => $customer['f_name'],
+            'userType' => 'customer',
+            'templateName'=> $customer['is_active'] ? 'account-unblock':'account-block',
             'subject' => $customer['is_active'] ? translate('Account_Unblocked').' !' : translate('Account_Blocked').' !',
             'title' => $customer['is_active'] ? translate('Account_Unblocked').' !' : translate('Account_Blocked').' !',
-            'message' => $message,
         ];
-        event(new CustomerStatusUpdateEvent(data: $data));
+        event(new CustomerStatusUpdateEvent(email:$customer['email'],data: $data));
         return response()->json(['message'=> translate('update_successfully')]);
     }
 
@@ -248,6 +241,11 @@ class CustomerController extends BaseController
         array_unshift($customers, $allCustomer);
         return response()->json($customers);
     }
+    public function getCustomerListWithoutAllCustomerName(Request $request): JsonResponse
+    {
+        $customers = $this->customerRepo->getCustomerNameList(request: $request)->toArray();
+        return response()->json($customers);
+    }
     public function add(CustomerRequest $request,CustomerService $customerService):RedirectResponse
     {
         $token = Str::random(120);
@@ -257,13 +255,15 @@ class CustomerController extends BaseController
         $this->shippingAddressRepo->add($this->shippingAddressService->getAddAddressData(request:$request,customerId: $customer['id'],addressType: 'home'));
         $resetRoute = getWebConfig('forgot_password_verification') == 'email' ? url('/') . '/customer/auth/reset-password?token='.$token : route('customer.auth.recover-password');
         $data = [
-            'name' => $request['f_name'],
+            'userName' => $request['f_name'],
+            'userType' => 'customer',
+            'templateName'=>'registration-from-pos',
             'subject' => translate('Customer_Registration_Successfully_Completed'),
             'title' => translate('welcome_to').' '.getWebConfig('company_name').'!',
-            'resetRoute' => $resetRoute,
+            'resetPassword' => $resetRoute,
             'message' => translate('thank_you_for_joining').' '.getWebConfig('company_name').'.'.translate('if_you_want_to_become_a_registered_customer_then_reset_your_password_below_by_using_this_').getWebConfig('forgot_password_verification').' '.(getWebConfig('forgot_password_verification') == 'email' ? $request['email'] : $request['phone']).'.'.translate('then_you’ll_be_able_to_explore_the_website_and_app_as_a_registered_customer').'.',
         ];
-        event(new CustomerRegistrationMailEvent($request['email'],$data));
+        event(new CustomerRegistrationEvent(email:$request['email'],data: $data));
         Toastr::success(translate('customer_added_successfully'));
         return redirect()->back();
     }

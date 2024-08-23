@@ -18,10 +18,9 @@ class PushNotificationService
             'order_refunded_message',
             'refund_request_canceled_message',
             'message_from_delivery_man',
+            'message_from_admin',
             'message_from_seller',
             'fund_added_by_admin_message',
-            'customer_block_message',
-            'customer_unblock_message',
         ];
         $vendor = [
             'new_order_message',

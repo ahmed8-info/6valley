@@ -7,50 +7,23 @@ use App\Models\FlashDeal;
 use App\Models\FlashDealProduct;
 use App\Models\Product;
 use App\Utils\Helpers;
+use App\Utils\ProductManager;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class FlashDealController extends Controller
 {
-    public function get_flash_deal()
+    public function getFlashDeal(): JsonResponse
     {
-        try {
-            $flash_deals = FlashDeal::where('deal_type','flash_deal')
-                ->where(['status' => 1])
-                ->whereDate('start_date', '<=', date('Y-m-d'))
-                ->whereDate('end_date', '>=', date('Y-m-d'))->first();
-            return response()->json($flash_deals, 200);
-        } catch (\Exception $e) {
-            return response()->json(['errors' => $e], 403);
-        }
-
+        $flashDeal = ProductManager::getPriorityWiseFlashDealsProductsQuery()['flashDeal'];
+        return response()->json($flashDeal, 200);
     }
 
-    public function get_products(Request $request, $deal_id)
+    public function getFlashDealProducts(Request $request, $deal_id): JsonResponse
     {
         $user = Helpers::get_customer($request);
-        $p_ids = FlashDealProduct::with(['product'])
-                ->whereHas('product',function($q){
-                    $q->active();
-                })
-                ->where(['flash_deal_id' => $deal_id])
-                ->pluck('product_id')->toArray();
-
-        if (count($p_ids) > 0) {
-            $products = Product::with(['rating', 'reviews'])
-                ->withCount(['wishList' => function($query) use($user){
-                    $query->where('customer_id', $user != 'offline' ? $user->id : '0');
-                }])
-                ->whereIn('id', $p_ids)
-                ->get();
-
-            $products?->map(function ($product) {
-                $product['reviews_count'] = $product->reviews->count();
-                unset($product->reviews);
-                return $product;
-            });
-            return response()->json(Helpers::product_data_formatting($products, true), 200);
-        }
-
-        return response()->json([], 200);
+        $userId = $user != 'offline' ? $user->id : '0';
+        $products = ProductManager::getPriorityWiseFlashDealsProductsQuery(id: $deal_id, userId: $userId)['flashDealProducts'];
+        return response()->json(Helpers::product_data_formatting($products, true), 200);
     }
 }

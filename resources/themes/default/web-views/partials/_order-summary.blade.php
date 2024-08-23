@@ -7,10 +7,10 @@
             @php($totalShippingCost=0)
             @php($orderWiseShippingDiscount=\App\Utils\CartManager::order_wise_shipping_discount())
             @php($totalDiscountOnProduct=0)
-            @php($cart=\App\Utils\CartManager::get_cart())
+            @php($cart=\App\Utils\CartManager::get_cart(type: 'checked'))
             @php($cartGroupIds=\App\Utils\CartManager::get_cart_group_ids())
-            @php($getShippingCost=\App\Utils\CartManager::get_shipping_cost())
-            @php($getShippingCostSavedForFreeDelivery=\App\Utils\CartManager::get_shipping_cost_saved_for_free_delivery())
+            @php($getShippingCost=\App\Utils\CartManager::get_shipping_cost(type: 'checked'))
+            @php($getShippingCostSavedForFreeDelivery=\App\Utils\CartManager::get_shipping_cost_saved_for_free_delivery(type: 'checked'))
             @if($cart->count() > 0)
                 @foreach($cart as $key => $cartItem)
                     @php($subTotal+=$cartItem['price']*$cartItem['quantity'])
@@ -121,13 +121,13 @@
         </div>
         @php($company_reliability = getWebConfig(name: 'company_reliability'))
         @if($company_reliability != null)
-            <div class="mt-5">
-                <div class="row justify-content-center g-4">
+            <div class="pt-5">
+                <div class="footer-slider owl-theme owl-carousel">
                     @foreach ($company_reliability as $key=>$value)
                         @if ($value['status'] == 1 && !empty($value['title']))
-                            <div class="col-sm-3 px-0 text-center mobile-padding">
+                            <div class="">
                                 <img class="order-summery-footer-image" alt=""
-                                     src="{{ getValidImage(path: 'storage/app/public/company-reliability/'.$value['image'], type: 'source', source: theme_asset(path: 'public/assets/front-end/img').'/'.$value['item'].'.png') }}">
+                                     src="{{ getStorageImages(path: imagePathProcessing(imageData: $value['image'],path:'company-reliability'), type: 'source', source: theme_asset(path: 'public/assets/front-end/img').'/'.$value['item'].'.png') }}">
                                 <div class="deal-title">{{translate($value['title'])}}</div>
                             </div>
                         @endif
@@ -136,17 +136,15 @@
             </div>
         @endif
 
-        <div class="mt-4">
+        <div class="pt-4">
             <a class="btn btn--primary btn-block proceed_to_next_button {{$cart->count() <= 0 ? 'disabled' : ''}} action-checkout-function">{{translate('proceed_to_Checkout')}}</a>
         </div>
 
-        @if( $cart->count() != 0)
-            <div class="d-flex justify-content-center mt-3">
-                <a href="{{route('home')}}" class="d-flex align-items-center gap-2 text-primary font-weight-bold">
-                    <i class="tio-back-ui fs-12"></i> {{translate('continue_Shopping')}}
-                </a>
-            </div>
-        @endif
+        <div class="d-flex justify-content-center mt-3">
+            <a href="{{route('home')}}" class="d-flex align-items-center gap-2 text-primary font-weight-bold">
+                <i class="tio-back-ui fs-12"></i> {{translate('continue_Shopping')}}
+            </a>
+        </div>
 
     </div>
 </aside>
@@ -158,7 +156,7 @@
                 class="text-base">{{ webCurrencyConverter(amount: $subTotal+$totalTax+$totalShippingCost-$coupon_dis-$totalDiscountOnProduct-$orderWiseShippingDiscount) }}</strong>
     </div>
     <a data-route="{{ Route::currentRouteName() }}"
-       class="btn btn--primary btn-block proceed_to_next_button text-capitalize {{$cart->count() <= 0 ? 'disabled' : ''}} action-checkout-function">{{translate('proceed_to_next')}}</a>
+       class="btn btn--primary btn-block proceed_to_next_button text-capitalize {{$cart->count() <= 0 ? 'disabled' : ''}} action-checkout-function">{{translate('proceed_to_checkout')}}</a>
 </div>
 
 @push('script')

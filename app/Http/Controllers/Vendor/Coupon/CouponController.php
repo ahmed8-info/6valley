@@ -4,7 +4,10 @@ namespace App\Http\Controllers\Vendor\Coupon;
 
 use App\Contracts\Repositories\CouponRepositoryInterface;
 use App\Contracts\Repositories\CustomerRepositoryInterface;
+use App\Contracts\Repositories\VendorRepositoryInterface;
+use App\Enums\ExportFileNames\Admin\Coupon as CouponExport;
 use App\Enums\ViewPaths\Vendor\Coupon;
+use App\Exports\CouponListExport;
 use App\Http\Controllers\BaseController;
 use App\Http\Requests\Vendor\CouponRequest;
 use App\Http\Requests\Vendor\CouponUpdateRequest;
@@ -16,6 +19,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class CouponController extends BaseController
 {
@@ -26,6 +31,7 @@ class CouponController extends BaseController
     public function __construct(
         private readonly CouponRepositoryInterface   $couponRepo,
         private readonly CustomerRepositoryInterface $customerRepo,
+        private readonly VendorRepositoryInterface $vendorRepo,
     )
     {
     }
@@ -151,6 +157,17 @@ class CouponController extends BaseController
             'view' => view(Coupon::QUICK_VIEW[VIEW], compact('coupon'))->render(),
         ]);
     }
-
-
+    public function exportList(Request $request): BinaryFileResponse
+    {
+        $vendorId = auth('seller')->id();
+        $vendor = $this->vendorRepo->getFirstWhere(params:['id' => $vendorId]);
+        $coupons = $this->couponRepo->getListWhere(orderBy:['id'=>'desc'],searchValue: $request['searchValue'],filters: ['added_by'=>'seller','vendorId'=>$vendorId] ,dataLimit: 'all');
+        return Excel::download(new CouponListExport([
+            'data-from' => 'vendor',
+            'vendor' => $vendor,
+            'coupon' => $coupons,
+            'search' => $request['searchValue'],
+        ]), CouponExport::EXPORT_XLSX
+        );
+    }
 }

@@ -80,34 +80,34 @@ class CouponController extends Controller
 
     public function apply(Request $request)
     {
-        $couponLimit = Order::where(['customer_id'=> $request->user()->id, 'coupon_code'=> $request['code']])
+        $couponLimit = Order::where(['customer_id' => $request->user()->id, 'coupon_code' => $request['code']])
             ->groupBy('order_group_id')->get()->count();
 
         $coupon_f = Coupon::where(['code' => $request['code']])
-            ->where('status',1)
+            ->where('status', 1)
             ->whereDate('start_date', '<=', date('Y-m-d'))
             ->whereDate('expire_date', '>=', date('Y-m-d'))->first();
 
-        if(!$coupon_f){
+        if (!$coupon_f) {
             return response()->json(translate('invalid_coupon'), 202);
         }
-        if($coupon_f && $coupon_f->coupon_type == 'first_order'){
+        if ($coupon_f && $coupon_f->coupon_type == 'first_order') {
             $coupon = $coupon_f;
-        }else{
+        } else {
             $coupon = $coupon_f->limit > $couponLimit ? $coupon_f : null;
         }
 
-        if($coupon && $coupon->coupon_type == 'first_order'){
-            $orders = Order::where(['customer_id'=> $request->user()->id])->count();
-            if($orders>0){
+        if ($coupon && $coupon->coupon_type == 'first_order') {
+            $orders = Order::where(['customer_id' => $request->user()->id])->count();
+            if ($orders > 0) {
                 return response()->json(translate('sorry_this_coupon_is_not_valid_for_this_user'), 202);
             }
         }
 
         if ($coupon && (($coupon->coupon_type == 'first_order') || ($coupon->coupon_type == 'discount_on_purchase' && ($coupon->customer_id == '0' || $coupon->customer_id == $request->user()->id)))) {
             $total = 0;
-            foreach (CartManager::get_cart_for_api($request) as $cart) {
-                if((is_null($coupon->seller_id) && $cart->seller_is=='admin') || $coupon->seller_id == '0' || ($coupon->seller_id == $cart->seller_id && $cart->seller_is=='seller')){
+            foreach (CartManager::get_cart_for_api(request: $request, type: 'checked') as $cart) {
+                if ((is_null($coupon->seller_id) && $cart->seller_is == 'admin') || $coupon->seller_id == '0' || ($coupon->seller_id == $cart->seller_id && $cart->seller_is == 'seller')) {
                     $product_subtotal = $cart['price'] * $cart['quantity'];
                     $total += $product_subtotal;
                 }
@@ -123,23 +123,23 @@ class CouponController extends Controller
                     'coupon_discount' => $discount
                 ], 200);
             }
-        }elseif($coupon && $coupon->coupon_type == 'free_delivery' && ($coupon->customer_id == '0' || $coupon->customer_id == $request->user()->id)){
+        } elseif ($coupon && $coupon->coupon_type == 'free_delivery' && ($coupon->customer_id == '0' || $coupon->customer_id == $request->user()->id)) {
             $total = 0;
             $shipping_fee = 0;
-            $shippingMethod=Helpers::get_business_settings('shipping_method');
+            $shippingMethod = Helpers::get_business_settings('shipping_method');
             $admin_shipping = \App\Models\ShippingType::where('seller_id', 0)->first();
             $shipping_type = isset($admin_shipping) == true ? $admin_shipping->shipping_type : 'order_wise';
 
-            foreach (CartManager::get_cart_for_api($request) as $cart) {
-                if($coupon->seller_id == '0' || (is_null($coupon->seller_id) && $cart->seller_is=='admin') || ($coupon->seller_id == $cart->seller_id && $cart->seller_is=='seller')) {
+            foreach (CartManager::get_cart_for_api(request: $request, type: 'checked') as $cart) {
+                if ($coupon->seller_id == '0' || (is_null($coupon->seller_id) && $cart->seller_is == 'admin') || ($coupon->seller_id == $cart->seller_id && $cart->seller_is == 'seller')) {
                     $product_subtotal = $cart['price'] * $cart['quantity'];
                     $total += $product_subtotal;
                     if (is_null($coupon->seller_id) || $coupon->seller_id == '0' || $coupon->seller_id == $cart->seller_id) {
                         $shipping_fee += $cart['shipping_cost'];
                     }
                 }
-                if($shipping_type == 'order_wise' && ($coupon->seller_id=='0' || (is_null($coupon->seller_id) && $cart->seller_is=='admin') || ($coupon->seller_id == $cart->seller_id && $cart->seller_is=='seller'))) {
-                    $shipping_fee += CartManager::get_shipping_cost($cart->cart_group_id);
+                if ($shipping_type == 'order_wise' && ($coupon->seller_id == '0' || (is_null($coupon->seller_id) && $cart->seller_is == 'admin') || ($coupon->seller_id == $cart->seller_id && $cart->seller_is == 'seller'))) {
+                    $shipping_fee += CartManager::get_shipping_cost(groupId: $cart->cart_group_id, type: 'checked');
                 }
             }
 
@@ -160,9 +160,8 @@ class CouponController extends Controller
             ->where(['status' => 1])
             ->whereDate('start_date', '<=', date('Y-m-d'))
             ->whereDate('expire_date', '>=', date('Y-m-d'))
-            ->when($seller_id == '0', function ($query) use($seller_ids){
-                $seller_ids[] = NULL;
-                return $query->whereIn('seller_id', $seller_ids);
+            ->when($seller_id == '0', function ($query) use ($seller_ids) {
+                return $query->whereNull('seller_id');
             })
             ->when($seller_id != '0', function ($query) use ($seller_ids, $seller_id) {
                 $seller_ids[] = $seller_id;

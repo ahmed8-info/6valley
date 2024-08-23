@@ -13,12 +13,16 @@ class VendorRegistrationMail extends Mailable
 {
     use Queueable, SerializesModels;
     protected $data;
+    protected $template;
+    protected $socialMedia;
     /**
      * Create a new message instance.
      */
-    public function __construct($data)
+    public function __construct($data, $template, $socialMedia)
     {
         $this->data = $data;
+        $this->template = $template;
+        $this->socialMedia = $socialMedia;
     }
 
     /**
@@ -37,7 +41,7 @@ class VendorRegistrationMail extends Mailable
     public function content(): Content
     {
         return new Content(
-            view: 'email-templates.vendor-registration',with: ['data'=>$this->data]
+            view: 'email-templates.index',with: ['data'=>$this->data,'template'=>$this->template,'socialMedia'=>$this->socialMedia]
         );
     }
 

@@ -22,7 +22,7 @@
                     @php($defaultLocation = getWebConfig(name: 'default_location'))
 
                     @if($physical_product_view)
-                    <input type="hidden" id="physical_product" name="physical_product" value="{{ $physical_product_view ? 'yes':'no'}}">
+                        <input type="hidden" id="physical_product" name="physical_product" value="{{ $physical_product_view ? 'yes':'no'}}">
                         <div class="px-3 px-md-0">
                             <h4 class="pb-2 mt-4 fs-18 text-capitalize">{{ translate('shipping_address')}}</h4>
                         </div>
@@ -184,6 +184,48 @@
                                 </ul>
                             </div>
                         </form>
+
+                        @if(!Auth::guard('customer')->check() && $web_config['guest_checkout_status'])
+                        <div class="card __card mt-3">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center flex-wrap justify-content-between gap-3">
+                                    <div class="min-h-45 form-check d-flex gap-3 align-items-center cursor-pointer user-select-none">
+                                        <input type="checkbox" id="is_check_create_account" name="is_check_create_account" class="form-check-input mt-0" value="1">
+                                        <label class="form-check-label font-weight-bold fs-13" for="is_check_create_account">
+                                            {{translate('Create_an_account_with_the_above_info')}}
+                                        </label>
+                                    </div>
+
+                                    <div class="is_check_create_account_password_group d--none">
+                                        <div class="d-flex gap-3 flex-wrap flex-sm-nowrap">
+                                            <div class="w-100">
+                                                {{-- <label class="form-label font-semibold">{{ translate('password') }}</label> --}}
+                                                <div class="password-toggle rtl">
+                                                    <input class="form-control text-align-direction" name="customer_password" type="password" id="customer_password" placeholder="{{ translate('new_Password') }}" required>
+                                                    <label class="password-toggle-btn">
+                                                        <input class="custom-control-input" type="checkbox">
+                                                        <i class="tio-hidden password-toggle-indicator"></i>
+                                                        <span class="sr-only">{{ translate('show_password') }}</span>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            <div class="w-100">
+                                                {{-- <label class="form-label font-semibold">{{ translate('confirm_Password') }}</label> --}}
+                                                <div class="password-toggle rtl">
+                                                    <input class="form-control text-align-direction w-100" name="customer_confirm_password" type="password" id="customer_confirm_password" placeholder="{{ translate('confirm_Password') }}" required>
+                                                    <label class="password-toggle-btn">
+                                                        <input class="custom-control-input" type="checkbox">
+                                                        <i class="tio-hidden password-toggle-indicator"></i>
+                                                        <span class="sr-only">{{ translate('show_password') }}</span>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        @endif
                     @endif
 
                     @if($billingInputByCustomer)
@@ -195,8 +237,8 @@
                             @if($physical_product_view)
                                 <div class="form-check d-flex gap-3 align-items-center">
                                     <input type="checkbox" id="same_as_shipping_address" name="same_as_shipping_address"
-                                        class="form-check-input action-hide-billing-address" {{$billingInputByCustomer==1?'':'checked'}}>
-                                    <label class="form-check-label" for="same_as_shipping_address">
+                                        class="form-check-input action-hide-billing-address mt-0" {{$billingInputByCustomer==1?'':'checked'}}>
+                                    <label class="form-check-label user-select-none" for="same_as_shipping_address">
                                         {{ translate('same_as_shipping_address')}}
                                     </label>
                                 </div>
@@ -204,10 +246,12 @@
                         </div>
 
                         @if(!$physical_product_view)
-                        <div class="rounded px-3 py-3 fs-15 text-base font-weight-medium custom-light-primary-color mb-3 d-flex align-items-center gap-2">
-                            <img src="{{ theme_asset('public/assets/front-end/img/icons/info-light.svg') }}" alt="">
-                            <span>{{ translate('When_you_input_all_the_required_information_for_this_billing_address_it_will_be_stored_for_future_purchases') }}</span>
-                        </div>
+                            <div class="mb-3 alert--info">
+                                <div class="d-flex align-items-center gap-2">
+                                    <img class="mb-1" src="{{ theme_asset('public/assets/front-end/img/icons/info-light.svg') }}" alt="Info">
+                                    <span>{{ translate('When_you_input_all_the_required_information_for_this_billing_address_it_will_be_stored_for_future_purchases') }}</span>
+                                </div>
+                            </div>
                         @endif
 
                         <form method="post" class="card __card" id="billing-address-form">
@@ -369,6 +413,46 @@
                             </div>
                         </form>
                     </div>
+
+                        @if(!Auth::guard('customer')->check() && $web_config['guest_checkout_status'] && !$physical_product_view)
+                            <div class="card __card mt-3">
+                                <div class="card-body">
+                                    <div class="d-flex align-items-center flex-wrap justify-content-between gap-3">
+                                        <div class="min-h-45 form-check d-flex gap-3 align-items-center cursor-pointer user-select-none">
+                                            <input type="checkbox" id="is_check_create_account" name="is_check_create_account" class="form-check-input mt-0" value="1">
+                                            <label class="form-check-label font-weight-bold fs-13" for="is_check_create_account">
+                                                {{translate('Create_an_account_with_the_above_info')}}
+                                            </label>
+                                        </div>
+
+                                        <div class="is_check_create_account_password_group d--none">
+                                            <div class="d-flex gap-3 flex-wrap flex-sm-nowrap">
+                                                <div class="w-100">
+                                                    <div class="password-toggle rtl">
+                                                        <input class="form-control text-align-direction" name="customer_password" type="password" id="customer_password" placeholder="{{ translate('new_Password')}}" required>
+                                                        <label class="password-toggle-btn">
+                                                            <input class="custom-control-input" type="checkbox">
+                                                            <i class="tio-hidden password-toggle-indicator"></i>
+                                                            <span class="sr-only">{{ translate('show_password') }}</span>
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                                <div class="w-100">
+                                                    <div class="password-toggle rtl">
+                                                        <input class="form-control text-align-direction" name="customer_confirm_password" type="password" id="customer_confirm_password" placeholder="{{ translate('confirm_Password')}}" required>
+                                                        <label class="password-toggle-btn">
+                                                            <input class="custom-control-input" type="checkbox">
+                                                            <i class="tio-hidden password-toggle-indicator"></i>
+                                                            <span class="sr-only">{{ translate('show_password') }}</span>
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        @endif
                     @endif
                 </div>
             </section>
@@ -401,6 +485,14 @@
                 $(inputElement).parent().find('.map-address-alert').removeClass('opacity-0').addClass('opacity-100')
             }
         }
+
+        $('#is_check_create_account').on('change', function() {
+            if($(this).is(':checked')) {
+                $('.is_check_create_account_password_group').fadeIn();
+            } else {
+                $('.is_check_create_account_password_group').fadeOut();
+            }
+        });
     </script>
 
     <script src="{{ theme_asset(path: 'public/assets/front-end/js/bootstrap-select.min.js') }}"></script>
@@ -409,6 +501,9 @@
 
 
     @if(getWebConfig('map_api_status') ==1 )
-    <script src="https://maps.googleapis.com/maps/api/js?key={{getWebConfig(name: 'map_api_key')}}&callback=mapsShopping&libraries=places&v=3.49" defer></script>
+        <script
+            src="https://maps.googleapis.com/maps/api/js?key={{getWebConfig('map_api_key')}}&callback=mapsShopping&loading=async&libraries=places&v=3.56"
+            defer>
+        </script>
     @endif
 @endpush

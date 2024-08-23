@@ -9,7 +9,7 @@
             <h2 class="h1 mb-0 text-capitalize d-flex align-items-center gap-2">
                 <img width="20" src="{{dynamicAsset(path: 'public/assets/back-end/img/customer.png')}}" alt="">
                 {{translate('customer_list')}}
-                <span class="badge badge-soft-dark radius-50">{{count($customers)}}</span>
+                <span class="badge badge-soft-dark radius-50">{{$customers->total()}}</span>
             </h2>
         </div>
         <div class="card">
@@ -73,7 +73,7 @@
                             <td>
                                 <a href="{{route('admin.customer.view',[$customer['id']])}}"
                                    class="title-color hover-c1 d-flex align-items-center gap-10">
-                                    <img src="{{getValidImage(path: 'storage/app/public/profile/'.$customer->image,type:'backend-profile')}}"
+                                    <img src="{{getStorageImages(path:$customer->image_full_url,type:'backend-profile')}}"
                                          class="avatar rounded-circle " alt="" width="40">
                                     {{Str::limit($customer['f_name']." ".$customer['l_name'],20)}}
                                 </a>

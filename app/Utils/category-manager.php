@@ -10,8 +10,7 @@ class CategoryManager
 {
     public static function parents()
     {
-        $x = Category::with(['childes.childes'])->where('position', 0)->priority()->get();
-        return $x;
+        return Category::with(['childes.childes'])->where('position', 0)->priority()->get();
     }
 
     public static function child($parent_id)
@@ -29,7 +28,9 @@ class CategoryManager
                 $query->where('customer_id', $user != 'offline' ? $user->id : '0');
             }])
             ->active()
-            ->where('category_ids', 'like', "%{$id}%")->get();
+            ->where('category_ids', 'like', "%{$id}%");
+
+        $products = ProductManager::getPriorityWiseCategoryWiseProductsQuery(query: $products, dataLimit: 'all');
 
         $currentDate = date('Y-m-d H:i:s');
         $products?->map(function ($product) use ($currentDate) {
@@ -66,18 +67,44 @@ class CategoryManager
         return '';
     }
 
-    public static function get_categories_with_counting()
+    public static function getCategoriesWithCountingAndPriorityWiseSorting($dataLimit = null)
     {
-        $categories = Category::withCount(['product'=>function($query){
-                        $query->where(['status'=>'1']);
-                    }])->with(['childes' => function ($query) {
-                        $query->with(['childes' => function ($query) {
-                            $query->withCount(['subSubCategoryProduct'])->where('position', 2);
-                        }])->withCount(['subCategoryProduct'])->where('position', 1);
-                    }, 'childes.childes'])
-                    ->where('position', 0)
-                    ->get();
+        $categories = Category::with(['product' => function ($query) {
+                return $query->active()->withCount(['orderDetails']);
+            }])->withCount(['product' => function ($query) {
+                $query->active();
+            }])->with(['childes' => function ($query) {
+            $query->with(['childes' => function ($query) {
+                $query->withCount(['subSubCategoryProduct'])->where('position', 2);
+            }])->withCount(['subCategoryProduct'])->where('position', 1);
+        }, 'childes.childes'])->where('position', 0);
 
-        return $categories;
+        $categoriesProcessed = self::getPriorityWiseCategorySortQuery(query: $categories->get());
+        if ($dataLimit) {
+            $categoriesProcessed = $categoriesProcessed->paginate($dataLimit);
+        }
+        return $categoriesProcessed;
+    }
+
+    public static function getPriorityWiseCategorySortQuery($query)
+    {
+        $categoryProductSortBy = getWebConfig(name: 'category_list_priority');
+        if ($categoryProductSortBy && ($categoryProductSortBy['custom_sorting_status'] == 1)) {
+            if ($categoryProductSortBy['sort_by'] == 'most_order') {
+                return $query->map(function ($category) {
+                    $category->order_count = $category?->product?->sum('order_details_count') ?? 0;
+                    return $category;
+                })->sortByDesc('order_count');
+            } elseif ($categoryProductSortBy['sort_by'] == 'latest_created') {
+                return $query->sortByDesc('id');
+            } elseif ($categoryProductSortBy['sort_by'] == 'first_created') {
+                return $query->sortBy('id');
+            } elseif ($categoryProductSortBy['sort_by'] == 'a_to_z') {
+                return $query->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE);
+            } elseif ($categoryProductSortBy['sort_by'] == 'z_to_a') {
+                return $query->sortByDesc('name', SORT_NATURAL | SORT_FLAG_CASE);
+            }
+        }
+        return $query->sortByDesc('priority');
     }
 }

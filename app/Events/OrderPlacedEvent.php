@@ -17,7 +17,11 @@ class OrderPlacedEvent
     /**
      * Create a new event instance.
      */
-    public function __construct(public ?object $notification=null, public readonly ?object $emailInfo=null)
+    public function __construct(
+        public ?object $notification=null,
+        public readonly ?string $email=null ,
+        public readonly ?array $data=null
+    )
     {}
 
     /**

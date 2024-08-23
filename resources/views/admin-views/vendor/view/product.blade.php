@@ -94,7 +94,6 @@
                                     <tr>
                                         <th>{{translate('SL')}}</th>
                                         <th>{{translate('product Name')}}</th>
-                                        <th>{{translate('purchase_price')}}</th>
                                         <th>{{translate('selling_price')}}</th>
                                         <th class="text-center">{{translate('featured')}}</th>
                                         <th class="text-center">{{translate('active_status')}}</th>
@@ -111,9 +110,6 @@
                                                    class="title-color hover-c1">
                                                     {{substr($product['name'],0,20)}}{{strlen($product['name'])>20?'...':''}}
                                                 </a>
-                                            </td>
-                                            <td>
-                                                {{setCurrencySymbol(amount: usdToDefaultCurrency(amount: $product['purchase_price']))}}
                                             </td>
                                             <td>
                                                 {{setCurrencySymbol(amount: usdToDefaultCurrency(amount: $product['unit_price']))}}

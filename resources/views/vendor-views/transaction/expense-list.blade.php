@@ -121,16 +121,15 @@
                             <button type="submit"
                                     class="btn btn--primary">{{ translate('search')}}</button>
                         </div>
-                        <!-- End Search -->
                     </form>
                     <div>
-                        <a href="{{ route('vendor.transaction.expense-transaction-summary-pdf', ['date_type'=>request('date_type'), 'from'=>request('from'), 'to'=>request('to')]) }}"
+                        <a href="{{ route('vendor.transaction.expense-transaction-summary-pdf', ['search'=>request('search'),'date_type'=>request('date_type'), 'from'=>request('from'), 'to'=>request('to')]) }}"
                            class="btn btn-outline--primary text-nowrap btn-block">
                             <i class="tio-file-text"></i>
                             {{translate('download_PDF')}}
                         </a>
                     </div>
-                    <div>
+                    <div class="dropdown">
                         <button type="button" class="btn btn-outline--primary text-nowrap btn-block"
                                 data-toggle="dropdown">
                             <i class="tio-download-to"></i>
@@ -140,7 +139,10 @@
                         <ul class="dropdown-menu dropdown-menu-right">
                             <li>
                                 <a class="dropdown-item"
-                                   href="{{ route('vendor.transaction.expense-transaction-export-excel', ['date_type'=>request('date_type'), 'from'=>request('from'), 'to'=>request('to'), 'search'=>request('search')]) }}">{{translate('excel')}}</a>
+                                   href="{{ route('vendor.transaction.expense-transaction-export-excel', ['date_type'=>request('date_type'), 'from'=>request('from'), 'to'=>request('to'), 'search'=>request('search')]) }}">
+                                    <img width="14" src="{{dynamicAsset(path: 'public/assets/back-end/img/excel.png')}}" alt="">
+                                    {{translate('excel')}}
+                                </a>
                             </li>
                         </ul>
                     </div>
@@ -166,7 +168,7 @@
                             <tr>
                                 <td>{{ $expense_transactions_table->firstItem()+$key }}</td>
                                 <td>{{ $transaction->orderTransaction->transaction_id }}</td>
-                                <td>{{ date_format($transaction->orderTransaction->updated_at, 'd F Y, h:i:s a') }}</td>
+                                <td>{{ date_format($transaction->updated_at, 'd F Y, h:i:s a') }}</td>
                                 <td>
                                     <a class="title-color"
                                        href="{{route('vendor.orders.details',['id'=>$transaction->id])}}">

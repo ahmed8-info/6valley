@@ -3,12 +3,14 @@
 namespace App\Http\Controllers\RestAPI\v1;
 
 use App\Http\Controllers\Controller;
+use App\Models\Cart;
 use App\Models\CartShipping;
 use App\Models\ShippingMethod;
 use App\Models\ShippingType;
 use App\Utils\CartManager;
 use App\Utils\Helpers;
 use App\Utils\OrderManager;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
@@ -24,7 +26,7 @@ class ShippingMethodController extends Controller
         }
     }
 
-    public function shipping_methods_by_seller($id, $seller_is)
+    public function shipping_methods_by_seller(Request $request, $id, $seller_is)
     {
         $seller_is = $seller_is == 'admin' ? 'admin' : 'seller';
         return response()->json(Helpers::get_shipping_methods($id, $seller_is), 200);
@@ -44,7 +46,7 @@ class ShippingMethodController extends Controller
         }
 
         if ($request['cart_group_id'] == 'all_cart_group') {
-            foreach (CartManager::get_cart_group_ids($request) as $group_id) {
+            foreach (CartManager::get_cart_group_ids(request: $request) as $group_id) {
                 $request['cart_group_id'] = $group_id;
                 self::insert_into_cart_shipping($request);
             }
@@ -67,18 +69,20 @@ class ShippingMethodController extends Controller
         $shipping->save();
     }
 
-    public function chosen_shipping_methods(Request $request)
+    public function chosen_shipping_methods(Request $request): JsonResponse
     {
-        $group_ids = CartManager::get_cart_group_ids($request);
-        $cart_shipping = CartShipping::whereIn('cart_group_id', $group_ids)->get();
+        $groupIds = CartManager::get_cart_group_ids(request: $request);
+        $cartShipping = CartShipping::whereIn('cart_group_id', $groupIds)->get();
 
-        $cart_shipping->map(function ($data) {
-            $free_delivery_status = OrderManager::free_delivery_order_amount($data['cart_group_id'])['status'];
-            $data['free_delivery_status'] = $free_delivery_status;
+        $cartShipping->map(function ($data) {
+            $isCheckedItemExist = Cart::where(['cart_group_id' => $data['cart_group_id'], 'is_checked' => 1])->exists();
+            $freeDeliveryStatus = OrderManager::free_delivery_order_amount($data['cart_group_id'])['status'];
+            $data['free_delivery_status'] = $freeDeliveryStatus;
+            $data['is_check_item_exist'] = $isCheckedItemExist ? 1 : 0;
             return $data;
         });
 
-        return response()->json($cart_shipping, 200);
+        return response()->json($cartShipping, 200);
     }
 
     public function check_shipping_type(Request $request)

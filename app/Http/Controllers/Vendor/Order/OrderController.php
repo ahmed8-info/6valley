@@ -19,6 +19,7 @@ use App\Enums\GlobalConstant;
 use App\Enums\ViewPaths\Vendor\Order;
 use App\Enums\WebConfigKey;
 use App\Events\OrderStatusEvent;
+use App\Exports\OrderExport;
 use App\Http\Controllers\BaseController;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\UploadDigitalFileAfterSellRequest;
@@ -32,6 +33,7 @@ use App\Traits\CustomerTrait;
 use App\Traits\FileManagerTrait;
 use App\Traits\PdfGenerator;
 use Brian2694\Toastr\Facades\Toastr;
+use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
@@ -39,7 +41,9 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\View as PdfView;
+use Maatwebsite\Excel\Facades\Excel;
 use Rap2hpoutre\FastExcel\FastExcel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class OrderController extends BaseController
@@ -142,13 +146,9 @@ class OrderController extends BaseController
         ));
     }
 
-    public function exportList(Request $request, $status): StreamedResponse|string|RedirectResponse
+    public function exportList(Request $request, $status): BinaryFileResponse|RedirectResponse
     {
         $vendorId = auth('seller')->id();
-        $searchValue = $request['searchValue'];
-        $status = $request['status'];
-        $relation = ['customer', 'shipping', 'shippingAddress', 'deliveryMan', 'billingAddress'];
-
         $filters = [
             'order_status' => $status,
             'filter' => $request['filter'] ?? 'all',
@@ -160,67 +160,70 @@ class OrderController extends BaseController
             'seller_id' => $vendorId,
             'seller_is' => 'seller',
         ];
-        $orders = $this->orderRepo->getListWhere(orderBy: ['id' => 'desc'], searchValue: $searchValue, filters: $filters, relations: $relation, dataLimit: 'all');
 
-        if ($orders->count() == 0) {
-            Toastr::warning(translate('order_data_is_not_available'));
-            return back();
-        }
+        $orders = $this->orderRepo->getListWhere(orderBy: ['id' => 'desc'], searchValue: $request['searchValue'], filters: $filters, relations: ['customer','seller.shop'], dataLimit: 'all');
 
-        $storage = [];
-        foreach ($orders as $item) {
-            $order_amount = $item->order_amount;
-            $discount_amount = $item->discount_amount;
-            $shipping_cost = $item->shipping_cost;
-            $extra_discount = $item->extra_discount;
-
-            if ($item->order_status == 'processing') {
-                $order_status = 'packaging';
-            } elseif ($item->order_status == 'failed') {
-                $order_status = 'Failed To Deliver';
-            } else {
-                $order_status = $item->order_status;
+        /** order status count  */
+        $status_array = [
+            'pending' => 0,
+            'confirmed' => 0,
+            'processing' => 0,
+            'out_for_delivery' => 0,
+            'delivered' => 0,
+            'returned' => 0,
+            'failed' => 0,
+            'canceled' => 0,
+        ];
+        $orders?->map(function ($order) use (&$status_array) { // Pass by reference using &
+            if (isset($status_array[$order->order_status])) {
+                $status_array[$order->order_status]++;
             }
+            $order?->orderDetails?->map(function ($details) use ($order) {
+                $order['total_qty'] += $details->qty;
+                $order['total_price'] += $details->qty * $details->price + ($details->tax_model == 'include' ? $details->qty * $details->tax : 0);
+                $order['total_discount'] += $details->discount;
+                $order['total_tax'] += $details->tax_model == 'exclude' ? $details->tax : 0;
+            });
 
-            $storage[] = [
-                'order_id' => $item->id,
-                'Customer Id' => $item->customer_id,
-                'Customer Name' => isset($item->customer) ? $item->customer->f_name . ' ' . $item->customer->l_name : 'not found',
-                'Order Group Id' => $item->order_group_id,
-                'Order Status' => $order_status,
-                'Order Amount' => usdToDefaultCurrency(amount: $order_amount),
-                'Order Type' => $item->order_type,
-                'Coupon Code' => $item->coupon_code,
-                'Discount Amount' => usdToDefaultCurrency(amount: $discount_amount),
-                'Discount Type' => $item->discount_type,
-                'Extra Discount' => usdToDefaultCurrency(amount: $extra_discount),
-                'Extra Discount Type' => $item->extra_discount_type,
-                'Payment Status' => $item->payment_status,
-                'Payment Method' => $item->payment_method,
-                'Transaction_ref' => $item->transaction_ref,
-                'Verification Code' => $item->verification_code,
-                'Billing Address' => isset($item->billingAddress) ? $item->billingAddress->address : 'not found',
-                'Billing Address Data' => $item->billing_address_data,
-                'Shipping Type' => $item->shipping_type,
-                'Shipping Address' => isset($item->shippingAddress) ? $item->shippingAddress->address : 'not found',
-                'Shipping Method Id' => $item->shipping_method_id,
-                'Shipping Method Name' => isset($item->shipping) ? $item->shipping->title : 'not found',
-                'Shipping Cost' => usdToDefaultCurrency(amount: $shipping_cost),
-                'Seller Id' => $item->seller_id,
-                'Seller Name' => isset($item->seller) ? $item->seller->f_name . ' ' . $item->seller->l_name : 'not found',
-                'Seller Email' => isset($item->seller) ? $item->seller->email : 'not found',
-                'Seller Phone' => isset($item->seller) ? $item->seller->phone : 'not found',
-                'Seller Is' => $item->seller_is,
-                'Shipping Address Data' => $item->shipping_address_data,
-                'Delivery Type' => $item->delivery_type,
-                'Delivery Man Id' => $item->delivery_man_id,
-                'Delivery Service Name' => $item->delivery_service_name,
-                'Third Party Delivery Tracking Id' => $item->third_party_delivery_tracking_id,
-                'Checked' => $item->checked,
-            ];
+        });
+        /** order status count  */
+
+        /** date */
+        $date_type = $request->date_type ?? '';
+        $from = match ($date_type) {
+            'this_year' => date('Y-01-01'),
+            'this_month' => date('Y-m-01'),
+            'this_week' => Carbon::now()->subDays(7)->startOfWeek()->format('Y-m-d'),
+            default => $request['from'] ?? '',
+        };
+        $to = match ($date_type) {
+            'this_year' => date('Y-12-31'),
+            'this_month' => date('Y-m-t'),
+            'this_week' => Carbon::now()->startOfWeek()->format('Y-m-d'),
+            default => $request['to'] ?? '',
+        };
+        /** end  */
+        $seller = $this->vendorRepo->getFirstWhere(['id' => $vendorId]);
+        $customer = [];
+        if ($request['customer_id'] != 'all' && $request->has('customer_id')) {
+            $customer = $this->customerRepo->getFirstWhere(['id' => $request['customer_id']]);
         }
 
-        return (new FastExcel($storage))->download('Order_All_details.xlsx');
+        $data = [
+            'data-from' => 'vendor',
+            'orders' => $orders,
+            'order_status' => $status,
+            'seller' => $seller,
+            'customer' => $customer,
+            'status_array' => $status_array,
+            'searchValue' => $request['searchValue'],
+            'order_type' => $request['filter'] ?? 'all',
+            'from' => $from,
+            'to' => $to,
+            'date_type' => $date_type,
+            'defaultCurrencyCode'=>getCurrencyCode(),
+        ];
+        return Excel::download(new OrderExport($data), 'Orders.xlsx');
     }
 
     public function getCustomers(Request $request): JsonResponse

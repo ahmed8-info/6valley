@@ -89,6 +89,7 @@ class CouponListExport implements FromView, ShouldAutoSize, WithStyles,WithColum
                     $event->sheet->mergeCells('C2:M2');
                     $event->sheet->mergeCells('D2:M2');
                     $event->sheet->getDefaultRowDimension()->setRowHeight(30);
+                $event->sheet->getRowDimension(2)->setRowHeight(60);
                     $workSheet = $event->sheet->getDelegate();
             },
         ];

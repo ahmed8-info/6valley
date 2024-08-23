@@ -44,6 +44,9 @@ class HelpTopicRepository implements HelpTopicRepositoryInterface
                 $query->where('question', 'like', "%{$searchValue}%")
                     ->orWhere('answer', 'like', "%{$searchValue}%");
             })
+            ->when(isset($filters['type']), function ($query) use ($filters) {
+                return $query->where(['type' => $filters['type']]);
+            })
             ->when(isset($filters['ranking']), function ($query) use ($filters) {
                 return $query->where(['ranking' => $filters['ranking']]);
             })
