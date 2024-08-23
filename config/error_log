@@ -1,0 +1,4 @@
+[05-May-2024 04:20:15 UTC] PHP Fatal error:  Uncaught Error: Call to undefined function env() in /home/admin/public_html/config/database.php:18
+Stack trace:
+#0 {main}
+  thrown in /home/admin/public_html/config/database.php on line 18
